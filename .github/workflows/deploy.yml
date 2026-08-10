@@ -1,4 +1,4 @@
-name: Build & Deploy kiedy-matura.pl
+﻿name: Build & Deploy kiedy-matura.pl
 
 on:
   workflow_dispatch:
@@ -11,8 +11,8 @@ concurrency:
   group: deploy-kiedy-matura
   cancel-in-progress: true
 
-# OIDC zamiast długożyjących kluczy — rola gh-deploy-kiedy-matura.pl ufa
-# wyłącznie temu repo na gałęzi main (patrz templates/aws/setup-deploy-role.sh).
+# OIDC zamiast dĹ‚ugoĹĽyjÄ…cych kluczy â€” rola gh-deploy-kiedy-matura.pl ufa
+# wyĹ‚Ä…cznie temu repo na gaĹ‚Ä™zi main (patrz templates/aws/setup-deploy-role.sh).
 permissions:
   id-token: write
   contents: read
@@ -31,26 +31,29 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+      # ARN roli i region nie sÄ… tajne (dostÄ™p i tak kontroluje trust policy
+      # OIDC), a trzymane jawnie eliminujÄ… caĹ‚Ä… klasÄ™ bĹ‚Ä™dĂłw â€žsekret zawiera
+      # niewidoczny znak".
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: arn:aws:iam::381492300277:role/gh-deploy-kiedy-matura.pl
+          aws-region: eu-central-1
 
-      # Assety mają hash w nazwie → cache na rok. HTML/XML/TXT krótko, bo
-      # licznik i „za X dni" starzeją się razem z buildem.
+      # Assety majÄ… hash w nazwie â†’ cache na rok. HTML/XML/TXT krĂłtko, bo
+      # licznik i â€žza X dni" starzejÄ… siÄ™ razem z buildem.
       - name: Sync do S3
         run: |
-          aws s3 sync dist/ "s3://${{ secrets.S3_BUCKET }}/" --delete --size-only \
+          aws s3 sync dist/ "s3://www.kiedy-matura.pl/" --delete --size-only \
             --cache-control "public, max-age=31536000, immutable" \
             --exclude "*.html" --exclude "robots.txt" --exclude "sitemap*.xml"
-          aws s3 sync dist/ "s3://${{ secrets.S3_BUCKET }}/" --delete \
+          aws s3 sync dist/ "s3://www.kiedy-matura.pl/" --delete \
             --cache-control "public, max-age=300, must-revalidate" \
             --exclude "*" --include "*.html" --include "robots.txt" --include "sitemap*.xml"
 
       - name: Inwalidacja CloudFront
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id "${{ secrets.CLOUDFRONT_DIST_ID }}" \
+            --distribution-id "E29IG4NRZRDOZ5" \
             --paths "/*" --query "Invalidation.Status" --output text
 
       - name: Weryfikacja
