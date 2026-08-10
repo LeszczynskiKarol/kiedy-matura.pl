@@ -1,0 +1,127 @@
+---
+import Icon from "../Icon.astro";
+import HeroIllustration from "../HeroIllustration.astro";
+import { Image } from "astro:assets";
+import BackgroundDecor from "../BackgroundDecor.astro";
+import { editAttrs } from "../../lib/edit";
+import type { HeroData } from "../../content.config";
+
+interface Props {
+  data: HeroData;
+  editPath: string;
+}
+const { data, editPath } = Astro.props;
+
+// Zdjęcie klienta w hero (data.image) — plik z src/assets/gallery/, ten sam
+// wzorzec co Gallery.astro: astro:assets wymaga importu, więc glob + lookup
+// po nazwie; build robi resize + WebP (sharp) automatycznie. (migracja v11)
+// UWAGA: helper MUSI być PO wszystkich importach — kompilator Astro hoistuje
+// importy i kod wpleciony między nie zostawia artefakt (`i;` → "i is not
+// defined" w runtime; złapane w teście 2026-07-11).
+const heroImages = import.meta.glob<{ default: ImageMetadata }>(
+  "../../assets/gallery/*.{jpg,jpeg,png,webp,avif}",
+  { eager: true }
+);
+function resolveHeroImage(name: string): ImageMetadata {
+  const hit = Object.entries(heroImages).find(([p]) => p.endsWith(`/${name}`));
+  if (!hit) {
+    throw new Error(`Hero: brak pliku src/assets/gallery/${name} (hero.image)`);
+  }
+  return hit[1].default;
+}
+
+// Hero bez grafiki (2026-07-30). Wcześniej siatka była na sztywno
+// dwukolumnowa i druga kolumna ZAWSZE renderowała zdjęcie albo SVG — więc
+// podstrona bez własnego zdjęcia dostawała albo powtórzone hero główne, albo
+// pustą kolumnę. Teraz brak media = jedna kolumna z ograniczoną szerokością
+// mierzoną w znakach: tekst wyrównany do lewej, spójnie z resztą treści
+// strony (wyśrodkowanie tworzyłoby wyrwę stylistyczną wobec sekcji poniżej).
+// Grafika zostaje tam, gdzie robi robotę — na stronie głównej.
+const hasMedia = Boolean(data.image) || (data.illustration && data.illustration !== "none");
+---
+
+<section
+  id={data.id}
+  class="relative overflow-hidden border-b border-[var(--color-border)]"
+  {...editAttrs(editPath)}
+  {...(import.meta.env.PUBLIC_EDIT_PREVIEW ? { "data-hero": "true" } : {})}
+>
+  {data.decor !== "none" && <BackgroundDecor variant={data.decor} intensity="subtle" />}
+
+  <div
+    class:list={[
+      "relative mx-auto grid max-w-6xl gap-12 px-4 py-20 sm:px-6 md:py-28 lg:px-8",
+      hasMedia && "md:grid-cols-2 md:items-center",
+    ]}
+  >
+    <div class:list={[!hasMedia && "max-w-[52ch]"]}>
+      {data.eyebrow && (
+        <span
+          class="inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-1 text-xs font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]"
+          {...editAttrs(`${editPath}.eyebrow`)}
+        >
+          <span class="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]"></span>
+          {data.eyebrow}
+        </span>
+      )}
+
+      <h1
+        class="mt-6 font-serif text-[length:var(--text-fs-display)] font-medium leading-[1.05] tracking-tight text-[var(--color-text)]"
+        {...editAttrs(`${editPath}.title`)}
+      >
+        {data.title}
+      </h1>
+
+      {data.subtitle && (
+        <p
+          class="mt-6 max-w-[55ch] text-lg leading-relaxed text-[var(--color-text-muted)]"
+          {...editAttrs(`${editPath}.subtitle`)}
+         set:html={data.subtitle}></p>
+      )}
+
+      <div class="mt-10 flex flex-wrap items-center gap-3">
+        {data.ctaPrimary && (
+          <a
+            href={data.ctaPrimary.href}
+            class="inline-flex items-center gap-2 rounded-md bg-[var(--color-accent)] px-6 py-3 text-base font-medium text-[var(--color-accent-fg)] no-underline transition-colors hover:bg-[var(--color-accent-hover)]"
+            {...editAttrs(`${editPath}.ctaPrimary.label`)}
+          >
+            {data.ctaPrimary.label}
+            <Icon name="arrow-right" class="h-4 w-4" />
+          </a>
+        )}
+        {data.ctaSecondary && (
+          <a
+            href={data.ctaSecondary.href}
+            class="inline-flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-6 py-3 text-base font-medium text-[var(--color-text)] no-underline transition-colors hover:bg-[var(--color-bg-subtle)]"
+            {...editAttrs(`${editPath}.ctaSecondary.label`)}
+          >
+            {data.ctaSecondary.label}
+          </a>
+        )}
+      </div>
+    </div>
+
+    {hasMedia && (
+    <div class="relative" {...(import.meta.env.PUBLIC_EDIT_PREVIEW ? { "data-hero-media": "true" } : {})}>
+      {/* Schema trzyma string, bo per-site dochodzą własne warianty ilustracji —
+          rozszerzając HeroIllustration, zaktualizuj jej unię Props. */}
+      {data.image ? (
+        <Image
+          src={resolveHeroImage(data.image)}
+          alt={data.title}
+          widths={[480, 760, 1080]}
+          sizes="(min-width: 1152px) 520px, (min-width: 768px) 45vw, calc(100vw - 2rem)"
+          format="webp"
+          quality={80}
+          loading="eager"
+          fetchpriority="high"
+          class="aspect-[4/3] w-full rounded-2xl border border-[var(--color-border)] object-cover shadow-lg"
+        />
+      ) : (
+        <HeroIllustration variant={data.illustration as "conceptual" | "minimal"} />
+      )}
+    </div>
+    )}
+  </div>
+</section>

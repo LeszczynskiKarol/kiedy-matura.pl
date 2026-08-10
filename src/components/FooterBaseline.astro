@@ -1,0 +1,50 @@
+---
+// Pasek "baseline" pod stopką strony — renderowany SERWEROWO w BaseLayout
+// (po <slot/>, więc wizualnie bezpośrednio pod per-projektową stopką).
+// Powstał 2026-07-11 po dwóch lekcjach:
+//   1. link "Ustawienia cookies" wstrzykiwany JS-em do <footer> lądował poza
+//      wewnętrznym kontenerem stopki — technicznie w DOM, praktycznie
+//      niewidoczny (RODO art. 7.3 wymaga, żeby cofnięcie zgody było RÓWNIE
+//      ŁATWE jak wyrażenie — więc link musi być widoczny),
+//   2. kredyt "Realizacja: Sitario.com" ma być prawdziwym <a> w HTML (SEO),
+//      nie tworem JS-a.
+// Zawartość warunkowa:
+//   - kredyt: siteConfig.features.sitarioCredit !== false (default WŁĄCZONY;
+//     klient wyłącza jednym kliknięciem w Ustawieniach edytora — za darmo),
+//   - "Ustawienia cookies": tylko gdy features.ga4 (bez analityki nie ma
+//     cookies wymagających zgody, więc i banera). Klik obsługuje skrypt
+//     w CookieConsent.astro (nasłuch na #cookie-settings-link).
+import { siteConfig } from "../config/site";
+
+const features = (siteConfig.features ?? {}) as Record<string, unknown>;
+const showCredit = features.sitarioCredit !== false;
+const showCookieSettings = Boolean(features.ga4);
+---
+
+{(showCredit || showCookieSettings) && (
+  <div class="border-t border-[var(--color-border)] bg-[var(--color-bg)]">
+    <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-3 gap-y-1 px-4 py-3 text-xs text-[var(--color-text-muted)] sm:px-6">
+      {showCredit && (
+        <span>
+          Realizacja:{" "}
+          <a
+            href="https://www.sitario.com/"
+            target="_blank"
+            rel="noopener"
+            class="hover:text-[var(--color-text)]"
+          >Sitario.com</a>
+        </span>
+      )}
+      {showCredit && showCookieSettings && <span aria-hidden="true">·</span>}
+      {showCookieSettings && (
+        <button
+          type="button"
+          id="cookie-settings-link"
+          class="cursor-pointer hover:text-[var(--color-text)]"
+        >
+          Ustawienia cookies
+        </button>
+      )}
+    </div>
+  </div>
+)}

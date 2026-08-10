@@ -1,0 +1,455 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import ThemeToggle from "../components/ThemeToggle.astro";
+import "../styles/countdown.css";
+import { EXAMS, MILESTONES, PHASES, ORACLE, OFFICIAL } from "../data/matura";
+import { mascotSvg, mascotName } from "../lib/mascots";
+import {
+  dt, daysBetween, fmtDate, fmtShort, capital,
+  DOW, dniWord, plural, HOLIDAYS,
+} from "../lib/matura-utils";
+
+/* ── Punkty odniesienia ─────────────────────────────────────────────── */
+const START = dt(EXAMS[0].d, EXAMS[0].t);              // 4 maja 2027, 9:00
+const LAST  = dt(EXAMS[EXAMS.length - 1].d, "15:00");
+const NOW   = new Date();
+
+/* Faza wyliczona w czasie builda — skrypt klienta poprawi ją, gdy build
+   się zestarzeje. Dzięki temu HTML nigdy nie wychodzi z pustym licznikiem. */
+const daysNow  = Math.max(0, daysBetween(NOW, START));
+const buildPhase =
+  PHASES.find((p: any) => daysNow <= p.max && daysNow >= p.min) ?? PHASES[0];
+
+/* Wehikuł czasu — fazy w kolejności chronologicznej + stan „po maturze". */
+const TRAVEL = PHASES.filter((p: any) => p.max >= 0)
+  .concat(PHASES.filter((p: any) => p.id === "wolnosc"));
+const TICKS = ["wrzesień","październik","grudzień","sto dni","luty","marzec",
+               "kwiecień","2 tyg.","tydzień","2 dni","jutro","dziś","potem"];
+const activeIdx = Math.max(0, TRAVEL.findIndex((p: any) => p.id === buildPhase.id));
+
+/* ── Kalendarz maja 2027 ────────────────────────────────────────────── */
+const byDay: Record<string, any[]> = {};
+for (const e of EXAMS) (byDay[e.d] ||= []).push(e);
+
+const Y = 2027, MO = 4;
+const lead = (new Date(Y, MO, 1).getDay() + 6) % 7;      // poniedziałek = 0
+const dim  = new Date(Y, MO + 1, 0).getDate();
+const cells = [];
+for (let day = 1; day <= dim; day++) {
+  const date = new Date(Y, MO, day);
+  const key  = `2027-05-${String(day).padStart(2, "0")}`;
+  const ex   = (byDay[key] || []).slice().sort((a, b) => a.t.localeCompare(b.t));
+  const core = ex.some((e) => e.core);
+  const wknd = date.getDay() === 0 || date.getDay() === 6;
+  const hol  = HOLIDAYS[key];
+  cells.push({
+    day, key, ex, core, wknd, hol, date,
+    tag: core ? ex.find((e) => e.core).s
+       : ex.length ? `${ex.length} ${plural(ex.length, "egzamin", "egzaminy", "egzaminów")}`
+       : hol ? "święto" : wknd ? "wolne" : "—",
+  });
+}
+
+/* ── Lista przedmiotów do wyboru ────────────────────────────────────── */
+const list = EXAMS.map((e: any, i: number) => ({ ...e, i })).filter((e: any) => !e.bil);
+const POP = ["Biologia","Chemia","Fizyka","Geografia","Historia",
+             "Wiedza o społeczeństwie","Informatyka","Filozofia"];
+const isPop = (e: any) => e.lvl === "PR" &&
+  (POP.includes(e.s) || ["Matematyka","Język polski","Język angielski"].includes(e.s));
+const coreSubj = list.filter((e: any) => e.core);
+const popSubj  = list.filter((e: any) => !e.core && isPop(e));
+const restSubj = list.filter((e: any) => !e.core && !isPop(e));
+
+/* ── Dane dla skryptu klienta ───────────────────────────────────────────
+   Teksty faz są już w HTML, więc klientowi wystarczą progi i kolory.
+   Infinity NIE przechodzi przez JSON (staje się null) — spłaszczamy je
+   do skończonych wartości, zanim trafią do define:vars. */
+const BIG = 99999;
+const clientData = {
+  phases: PHASES.map((p: any) => ({
+    id: p.id,
+    max: p.max === Infinity ? BIG : p.max,
+    min: p.min === -Infinity ? -BIG : p.min,
+    c1: p.c1, c2: p.c2,
+  })),
+  travelIds: TRAVEL.map((p: any) => p.id),
+  oracle: ORACLE,
+  exams: EXAMS.map((e: any) => ({ d: e.d, t: e.t, s: e.s, lvl: e.lvl, core: !!e.core, bil: !!e.bil })),
+  start: `${EXAMS[0].d}T${EXAMS[0].t}`,
+  last: `${EXAMS[EXAMS.length - 1].d}T15:00`,
+  results: "2027-07-07T08:30",
+  yearStart: "2026-09-01T00:00",
+  official: OFFICIAL,
+};
+
+/* ── SEO ────────────────────────────────────────────────────────────── */
+const title = "Kiedy matura 2027? Odliczanie, harmonogram i kalendarz";
+const description =
+  "Ile dni do matury 2027? Żywe odliczanie, pełny harmonogram egzaminów, kalendarz maja " +
+  "i wszystkie ważne terminy — od deklaracji przez studniówkę po wyniki.";
+
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      { "@type": "Question", name: "Kiedy jest matura 2027?", acceptedAnswer: { "@type": "Answer",
+        text: "Sesja pisemna matury 2027 rozpoczyna się we wtorek 4 maja 2027 o godzinie 9:00 egzaminem z języka polskiego na poziomie podstawowym i kończy się 21 maja 2027. Oficjalny harmonogram CKE ogłasza do 20 sierpnia 2026." } },
+      { "@type": "Question", name: "Do kiedy trzeba złożyć deklarację maturalną 2027?", acceptedAnswer: { "@type": "Answer",
+        text: "Deklaracja wstępna do 30 września 2026, deklaracja ostateczna do 7 lutego 2027." } },
+      { "@type": "Question", name: "Ile procent trzeba, żeby zdać maturę?", acceptedAnswer: { "@type": "Answer",
+        text: "Co najmniej 30% z każdego przedmiotu obowiązkowego na poziomie podstawowym: języka polskiego, matematyki i języka obcego nowożytnego, w części pisemnej i ustnej. Z przedmiotu dodatkowego na poziomie rozszerzonym wystarczy przystąpić do egzaminu." } },
+      { "@type": "Question", name: "Kiedy są wyniki matury 2027?", acceptedAnswer: { "@type": "Answer",
+        text: "Wyniki matury 2027 zostaną ogłoszone na początku lipca 2027, a egzamin poprawkowy odbędzie się w drugiej połowie sierpnia 2027." } },
+    ],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: "Matura 2027 — egzamin z języka polskiego (poziom podstawowy)",
+    startDate: "2027-05-04T09:00:00+02:00",
+    endDate: "2027-05-21T15:00:00+02:00",
+    eventStatus: "https://schema.org/EventScheduled",
+    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+    location: { "@type": "Place", name: "Szkoły ponadpodstawowe w Polsce",
+                address: { "@type": "PostalAddress", addressCountry: "PL" } },
+    description: "Sesja główna egzaminu maturalnego 2027. Termin przewidywany do czasu ogłoszenia komunikatu CKE.",
+  },
+];
+---
+
+<BaseLayout title={title} description={description} jsonLd={jsonLd}>
+  <div class="bg" aria-hidden="true">
+    <div class="bg-aurora a1"></div>
+    <div class="bg-aurora a2"></div>
+    <div class="bg-aurora a3"></div>
+    <div class="bg-scrim"></div>
+    <div class="bg-grid"></div>
+    <svg class="bg-grain"><filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3"/></filter><rect width="100%" height="100%" filter="url(#grain)"/></svg>
+  </div>
+
+  <header class="site-head">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6.5V12l3.5 2.5"/></svg>
+      </span>
+      <span class="brand-text">kiedy&#8209;matura<span class="brand-dim">.pl</span></span>
+    </a>
+    <div class="head-right">
+      <nav class="site-nav">
+        <a href="#twoja">Twoja matura</a>
+        <a href="#kalendarz">Kalendarz</a>
+        <a href="#os">Oś czasu</a>
+        <a href="#faq">Pytania</a>
+      </nav>
+      <ThemeToggle />
+    </div>
+  </header>
+
+  <main id="main">
+
+    <section class="hero">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          {TRAVEL.map((p: any, k: number) => (
+            <p class="kicker phase-el" data-phase={p.id} hidden={k !== activeIdx}>{p.kicker}</p>
+          ))}
+
+          <div class="count">
+            <div class="count-main">
+              <span class="count-num" id="days">{daysNow}</span>
+              <span class="count-word" id="daysWord">{dniWord(daysNow)} do matury</span>
+            </div>
+            <div class="count-sub" id="clock">
+              <span class="cs"><b id="hh">00</b><i>godz</i></span>
+              <span class="cs"><b id="mm">00</b><i>min</i></span>
+              <span class="cs"><b id="ss">00</b><i>sek</i></span>
+            </div>
+            <p class="count-target" id="target">
+              <span class="tg-line">Start: <b>{capital(DOW[START.getDay()])}, {fmtDate(START)}, godz. 9:00</b></span>
+              <span class="tg-line">język polski, poziom podstawowy</span>
+              {!OFFICIAL && <span class="tg-badge">termin przewidywany</span>}
+            </p>
+          </div>
+
+          {TRAVEL.map((p: any, k: number) => (
+            <h1 class="phase-title phase-el" data-phase={p.id} hidden={k !== activeIdx}>{p.title}</h1>
+          ))}
+          {TRAVEL.map((p: any, k: number) => (
+            <p class="phase-lead phase-el" data-phase={p.id} hidden={k !== activeIdx}>{p.lead}</p>
+          ))}
+          {TRAVEL.map((p: any, k: number) => (
+            <p class="phase-quote phase-el" data-phase={p.id} hidden={k !== activeIdx}>„{p.quote}"</p>
+          ))}
+        </div>
+
+        <div class="hero-stage">
+          <div class="stage-glow" aria-hidden="true"></div>
+          <div class="stage" id="stage" role="button" tabindex="0"
+               aria-label="Kliknij bohatera, żeby usłyszeć wyrocznię">
+            <div class="mascot" id="mascot">
+              {TRAVEL.map((p: any, k: number) => (
+                <div class="mascot-slot phase-el" data-phase={p.id} hidden={k !== activeIdx}
+                     set:html={mascotSvg(p.mascot)} />
+              ))}
+            </div>
+          </div>
+          <div class="nameplate">
+            <span class="np-dot" aria-hidden="true"></span>
+            {TRAVEL.map((p: any, k: number) => (
+              <span class="np-name phase-el" data-phase={p.id} hidden={k !== activeIdx}>{mascotName(p.mascot)}</span>
+            ))}
+            <span class="np-hint">stuknij mnie</span>
+          </div>
+          <div class="oracle" id="oracle" role="status" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <div class="timewarp">
+        <div class="tw-head">
+          <span class="tw-label">Wehikuł czasu</span>
+          <span class="tw-desc">przewiń i zobacz, kim będziesz w każdej fazie roku maturalnego</span>
+          <button class="tw-now" id="twNow" type="button" hidden>← wróć do teraz</button>
+        </div>
+        <input class="tw-range" id="twRange" type="range" min="0" max={TRAVEL.length - 1}
+               step="1" value={activeIdx} aria-label="Przewiń przez fazy roku maturalnego" />
+        <div class="tw-ticks" id="twTicks" aria-hidden="true">
+          {TICKS.slice(0, TRAVEL.length).map((t, k) => (
+            <span class={k === activeIdx ? "on" : undefined}>{t}</span>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <section class="yearbar-wrap">
+      <div class="yearbar">
+        <div class="yb-track"><div class="yb-fill" id="ybFill"></div><div class="yb-knob" id="ybKnob"></div></div>
+        <div class="yb-legend">
+          <span>1 września 2026</span>
+          <strong id="ybPct">rok maturalny</strong>
+          <span>4 maja 2027</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" id="twoja">
+      <div class="sec-head">
+        <h2>Twoja matura</h2>
+        <p>Zaznacz swoje egzaminy. Policzymy, kiedy zaczynasz, kiedy kończysz i ile trwa Twoja osobista wersja maja.</p>
+      </div>
+
+      <div class="picker">
+        <div class="picker-tools">
+          <div class="chips" id="quickPick">
+            <button class="chip" data-q="0" type="button">zestaw obowiązkowy</button>
+            <button class="chip" data-q="1" type="button">+ angielski PR</button>
+            <button class="chip" data-q="2" type="button">profil bio-chem</button>
+            <button class="chip" data-q="3" type="button">profil mat-fiz</button>
+            <button class="chip" data-q="4" type="button">profil human</button>
+          </div>
+          <button class="btn-ghost" id="clearPick" type="button">wyczyść</button>
+        </div>
+
+        <div class="subject-wrap" id="subjectGrid">
+          <p class="grp">Obowiązkowe <span>— zdaje je każdy</span></p>
+          <div class="subject-grid">
+            {coreSubj.map((e: any) => (
+              <label class="subj">
+                <input type="checkbox" value={e.i} />
+                <span class="sbox"></span>
+                <span class="sname">{e.s}<span class="sdate">{fmtShort(dt(e.d))}, {e.t}</span></span>
+                <span class="slvl">{e.lvl}</span>
+              </label>
+            ))}
+          </div>
+
+          <p class="grp">Najczęstsze rozszerzenia</p>
+          <div class="subject-grid">
+            {popSubj.map((e: any) => (
+              <label class="subj">
+                <input type="checkbox" value={e.i} />
+                <span class="sbox"></span>
+                <span class="sname">{e.s}<span class="sdate">{fmtShort(dt(e.d))}, {e.t}</span></span>
+                <span class="slvl">{e.lvl}</span>
+              </label>
+            ))}
+          </div>
+
+          <details class="more">
+            <summary>pozostałe przedmioty i języki ({restSubj.length})</summary>
+            <div class="subject-grid">
+              {restSubj.map((e: any) => (
+                <label class="subj">
+                  <input type="checkbox" value={e.i} />
+                  <span class="sbox"></span>
+                  <span class="sname">{e.s}<span class="sdate">{fmtShort(dt(e.d))}, {e.t}</span></span>
+                  <span class="slvl">{e.lvl}</span>
+                </label>
+              ))}
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div class="mine" id="mine" hidden>
+        <div class="mine-card">
+          <span class="mine-label">Twój pierwszy egzamin</span>
+          <strong class="mine-val" id="mineFirst">—</strong>
+          <span class="mine-meta" id="mineFirstIn">—</span>
+        </div>
+        <div class="mine-card">
+          <span class="mine-label">Twój ostatni egzamin</span>
+          <strong class="mine-val" id="mineLast">—</strong>
+          <span class="mine-meta" id="mineLastIn">—</span>
+        </div>
+        <div class="mine-card">
+          <span class="mine-label">Twoja sesja trwa</span>
+          <strong class="mine-val" id="mineSpan">—</strong>
+          <span class="mine-meta" id="mineCount">—</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" id="kalendarz">
+      <div class="sec-head">
+        <h2>Maj 2027, dzień po dniu</h2>
+        <p>Cały miesiąc, w którym mieści się rok nauki. Kliknij dzień, żeby zobaczyć, co się wtedy pisze.</p>
+      </div>
+
+      <div class="cal-wrap">
+        <div class="cal">
+          <div class="cal-dow"><span>Pn</span><span>Wt</span><span>Śr</span><span>Cz</span><span>Pt</span><span>So</span><span>Nd</span></div>
+          <div class="cal-grid" id="calGrid">
+            {Array.from({ length: lead }).map(() => <div class="cell out"></div>)}
+            {cells.map((c) => (
+              <button
+                class:list={["cell", c.core && "has-core", c.ex.length && !c.core && "has-ext",
+                             c.wknd && "weekend", c.hol && !c.ex.length && "holiday",
+                             c.key === "2027-05-04" && "sel"]}
+                type="button" data-d={c.key}>
+                <span class="dnum">{c.day}</span>
+                {c.ex.length > 0 && !c.core && (
+                  <span class="dots">{c.ex.slice(0, 4).map(() => <i></i>)}</span>
+                )}
+                <span class="dtag">{c.tag}</span>
+              </button>
+            ))}
+          </div>
+          <div class="cal-legend">
+            <span><i class="lg lg-core"></i>obowiązkowy</span>
+            <span><i class="lg lg-ext"></i>rozszerzenie</span>
+            <span><i class="lg lg-free"></i>wolne</span>
+          </div>
+        </div>
+
+        <aside class="cal-panel" id="calPanel">
+          {cells.map((c) => (
+            <div class="cp-body day-panel" data-day={c.key} hidden={c.key !== "2027-05-04"}>
+              <p class="cp-date">{capital(DOW[c.date.getDay()])}, {fmtDate(c.date)}</p>
+              <p class="cp-count" data-count-for={c.key}>{
+                (() => { const n = daysBetween(NOW, c.date);
+                  return n > 0 ? `za ${n} ${dniWord(n)}` : n === 0 ? "to dzisiaj" : `${Math.abs(n)} ${dniWord(n)} temu`; })()
+              }</p>
+              {c.ex.length > 0 ? (
+                <ul class="cp-list">
+                  {c.ex.map((e: any) => (
+                    <li class={e.core ? "core" : undefined}>
+                      <span class="cp-time">{e.t}</span>
+                      <span>{e.s}</span>
+                      <span class="cp-lvl">{e.lvl}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : c.hol ? (
+                <ul class="cp-list">
+                  <li><span class="cp-time">—</span><span>{c.hol}</span><span class="cp-lvl">dzień wolny</span></li>
+                </ul>
+              ) : null}
+              <p class="cp-note">{
+                c.ex.length ? (c.ex.find((e: any) => e.note)?.note
+                  ?? "Dzień rozszerzeń. Dla części rocznika zupełnie zwyczajny, dla części — ten jeden jedyny, który się liczy.")
+                : c.hol ? "Dzień ustawowo wolny. To właśnie przez majowy weekend matura zaczyna się dopiero 4 maja — i to jest jedyny prezent, jaki dostajesz od kalendarza."
+                : c.wknd ? "Weekend w środku sesji. Teoretycznie odpoczynek, praktycznie powtórka z tego, co w poniedziałek."
+                : "Tego dnia nie ma egzaminów pisemnych. Mogą się odbywać egzaminy ustne — a to zupełnie osobny gatunek stresu."
+              }</p>
+            </div>
+          ))}
+        </aside>
+      </div>
+    </section>
+
+    <section class="sec" id="os">
+      <div class="sec-head">
+        <h2>Cały rok maturalny</h2>
+        <p>Siedem punktów, w których rok robi się nagle bardzo konkretny.</p>
+      </div>
+      <ol class="timeline" id="timeline">
+        {MILESTONES.map((m: any) => {
+          const d = dt(m.d); const n = daysBetween(NOW, d); const past = n < 0;
+          return (
+            <li class:list={["tl", m.main && "is-main", past && "past"]} data-date={m.d}>
+              <div class="tl-top">
+                <span class="tl-date">{fmtDate(d)}{m.approx && <span class="tl-approx"> (ok.)</span>}</span>
+                <span class="tl-label">{m.label}</span>
+                <span class="tl-in" data-in-for={m.d}>{
+                  past ? `${Math.abs(n)} ${dniWord(n)} temu` : n === 0 ? "dzisiaj" : `za ${n} ${dniWord(n)}`
+                }</span>
+              </div>
+              <p class="tl-desc">{m.desc}</p>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+
+    <section class="sec" id="faq">
+      <div class="sec-head">
+        <h2>Konkrety, bez żartów</h2>
+        <p>Ta część jest serio. Reszta strony może sobie pozwolić na więcej.</p>
+      </div>
+
+      <div class="faq">
+        <details open>
+          <summary>Kiedy dokładnie jest matura 2027?</summary>
+          <p>Sesja pisemna rusza <strong>we wtorek 4 maja 2027 o 9:00</strong> egzaminem z języka polskiego na poziomie podstawowym — bo egzaminy tradycyjnie zaczynają się w pierwszy dzień roboczy po 3 maja, a w 2027 roku 3 maja wypada w poniedziałek. Pisemna część kończy się <strong>21 maja</strong>.</p>
+        </details>
+        <details>
+          <summary>Czy te daty są oficjalne?</summary>
+          <p>Jeszcze nie. <strong>CKE publikuje komunikat o harmonogramie matury 2027 do 20 sierpnia 2026 roku.</strong> Do tego czasu terminy na tej stronie są przewidywane — odwzorowane jeden do jednego na realnym harmonogramie z 2026 roku (ten sam układ dni tygodnia, te same godziny, ta sama kolejność przedmiotów). Po ogłoszeniu komunikatu podmienimy je na oficjalne, a odliczanie przeskoczy samo.</p>
+        </details>
+        <details>
+          <summary>Do kiedy trzeba złożyć deklarację?</summary>
+          <p><strong>Deklaracja wstępna — do 30 września 2026. Deklaracja ostateczna — do 7 lutego 2027.</strong> Po tej drugiej dacie zmiana przedmiotu jest już praktycznie niemożliwa, więc to jest ten moment, w którym warto się zastanowić dwa razy, a nie dwadzieścia razy w kwietniu.</p>
+        </details>
+        <details>
+          <summary>Co trzeba mieć ze sobą na egzaminie?</summary>
+          <p><strong>Dowód osobisty lub paszport</strong> (legitymacja nie wystarczy), <strong>czarny długopis</strong> — najlepiej dwa, <strong>butelkę wody bez etykiety</strong>. Na matematykę: linijkę, cyrkiel i kalkulator prosty; karty wzorów dostajesz na miejscu. Telefon i smartwatch zostają poza salą — bez wyjątków i bez negocjacji.</p>
+        </details>
+        <details>
+          <summary>Ile trzeba zdobyć, żeby zdać?</summary>
+          <p><strong>30% z każdego przedmiotu obowiązkowego</strong> na poziomie podstawowym: polski, matematyka i język obcy — pisemnie oraz ustnie z polskiego i języka obcego. Z przedmiotu rozszerzonego trzeba tylko przystąpić; wynik nie decyduje o zdaniu, tylko o rekrutacji na studia.</p>
+        </details>
+        <details>
+          <summary>Kiedy będą wyniki i kiedy jest poprawka?</summary>
+          <p>Wyniki matury 2027 poznasz <strong>na początku lipca 2027</strong> (w 2026 roku był to 8 lipca). Egzamin poprawkowy — <strong>w drugiej połowie sierpnia 2027</strong>, i przysługuje tylko wtedy, gdy nie zdałeś <em>jednego</em> przedmiotu obowiązkowego. Wyniki poprawki: wrzesień.</p>
+        </details>
+      </div>
+
+      <p class="disclaimer">
+        Strona informacyjna, tworzona z sympatii do maturzystów. Jedynym wiążącym źródłem terminów jest komunikat dyrektora
+        Centralnej Komisji Egzaminacyjnej — <a href="https://cke.gov.pl" rel="nofollow noopener" target="_blank">cke.gov.pl</a>.
+        Zanim podejmiesz decyzję na podstawie daty z internetu, sprawdź ją u swojego wychowawcy.
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-foot">
+    <p class="foot-line">kiedy-matura.pl — odliczanie, które kibicuje.</p>
+    <p class="foot-dim">Powodzenia. Serio, powodzenia.</p>
+  </footer>
+
+  <script is:inline define:vars={{ KM: clientData }}>
+    window.__KM = KM;
+  </script>
+  <script src="/js/countdown.js" defer is:inline></script>
+</BaseLayout>

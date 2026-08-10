@@ -1,0 +1,56 @@
+---
+import Logo from "./Logo.astro";
+import SocialLinks from "./SocialLinks.astro";
+import { siteConfig } from "../config/site";
+import navigation from "../content/navigation.json";
+import { editAttrs } from "../lib/edit";
+
+const { tagline, links } = navigation.footer;
+---
+
+<footer class="border-t border-[var(--color-border)] bg-[var(--color-bg-elevated)]">
+  <div class="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:grid-cols-3 sm:px-6 lg:px-8">
+    <div>
+      <Logo />
+      <p class="mt-3 max-w-xs text-sm text-[var(--color-text-muted)]" {...editAttrs("navigation#footer.tagline")}>
+        {tagline}
+      </p>
+      {/* Ikony socialowe (v32) — renderują się tylko ustawione profile */}
+      <SocialLinks class="mt-4" />
+    </div>
+    <div>
+      <p class="text-xs font-medium uppercase tracking-[0.1em] text-[var(--color-text-faint)]">Nawigacja</p>
+      <ul class="mt-3 space-y-2 text-sm" {...editAttrs("navigation#footer.links")}>
+        {links.map((link) => (
+          <li>
+            <a href={link.href} class="text-[var(--color-text-muted)] no-underline hover:text-[var(--color-text)]">
+              {link.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+    <div>
+      <p class="text-xs font-medium uppercase tracking-[0.1em] text-[var(--color-text-faint)]">Kontakt</p>
+      <ul class="mt-3 space-y-2 text-sm">
+        <li>
+          <a href={`mailto:${siteConfig.contact.email}`} class="text-[var(--color-text-muted)] no-underline hover:text-[var(--color-text)]">
+            {siteConfig.contact.email}
+          </a>
+        </li>
+        <li>
+          {/* Linki wewnętrzne ZAWSZE z trailing slashem — kanoniczna forma na
+              S3/CloudFront to /sciezka/ (bez slasha = 301 → slash = zbędny hop). */}
+          <a href="/polityka-prywatnosci/" class="text-[var(--color-text-muted)] no-underline hover:text-[var(--color-text)]">
+            Polityka prywatności
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+  <div class="border-t border-[var(--color-border)]">
+    <div class="mx-auto max-w-6xl px-4 py-4 text-xs text-[var(--color-text-faint)] sm:px-6 lg:px-8">
+      © {new Date().getFullYear()} {siteConfig.name}. Wszystkie prawa zastrzeżone.
+    </div>
+  </div>
+</footer>

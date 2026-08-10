@@ -1,0 +1,22 @@
+---
+// Sekcja treści ciągłej dla podstron informacyjnych. Kontener ma data-prose —
+// underline w linkach jest tu dozwolony (global.css ogranicza underline do prose).
+import { editAttrs } from "../../lib/edit";
+import { sectionBg } from "../../lib/sections";
+import type { ProseData } from "../../content.config";
+
+interface Props {
+  data: ProseData;
+  editPath: string;
+}
+const { data, editPath } = Astro.props;
+---
+
+<section id={data.id} class:list={[sectionBg(data.background)]} {...editAttrs(editPath)}>
+  <div
+    class="prose mx-auto max-w-[72ch] px-4 py-16 sm:px-6 lg:py-20"
+    data-prose
+    {...editAttrs(`${editPath}.html`)}
+    set:html={data.html}
+  />
+</section>

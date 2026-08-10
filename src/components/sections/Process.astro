@@ -1,0 +1,58 @@
+---
+import IconBadge from "../IconBadge.astro";
+import BackgroundDecor from "../BackgroundDecor.astro";
+import { editAttrs } from "../../lib/edit";
+import { balancedGrid } from "../../lib/grid";
+import { sectionBg } from "../../lib/sections";
+import type { ProcessData } from "../../content.config";
+
+interface Props {
+  data: ProcessData;
+  editPath: string;
+}
+const { data, editPath } = Astro.props;
+const grid = balancedGrid(data.steps.length);
+---
+
+<section
+  id={data.id}
+  class:list={["relative overflow-hidden border-b border-[var(--color-border)]", sectionBg(data.background)]}
+  {...editAttrs(editPath)}
+>
+  {data.decor !== "none" && <BackgroundDecor variant="dots" intensity="subtle" />}
+
+  <div class="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+    <div class="max-w-2xl">
+      {data.badge && <IconBadge icon={data.badge.icon} label={data.badge.label} tone={data.badge.tone} editPath={`${editPath}.badge.label`} />}
+      <h2
+        class="mt-4 font-serif text-[length:var(--text-fs-h2)] font-medium leading-tight tracking-tight"
+        {...editAttrs(`${editPath}.title`)}
+      >
+        {data.title}
+      </h2>
+      {data.intro && (
+        <p class="mt-4 text-lg text-[var(--color-text-muted)]" {...editAttrs(`${editPath}.intro`)} set:html={data.intro}></p>
+      )}
+    </div>
+
+    <ol class:list={["mt-12 gap-6", grid.container]}>
+      {data.steps.map((step, i) => (
+        <li
+          class:list={[
+            "relative flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-6",
+            grid.item(i),
+          ]}
+          {...editAttrs(`${editPath}.steps.${i}`)}
+        >
+          <span class="font-mono text-3xl font-bold text-[var(--color-accent)]/30" data-step-no>
+            0{i + 1}
+          </span>
+          <h3 class="font-sans text-lg font-semibold leading-snug" {...editAttrs(`${editPath}.steps.${i}.title`)}>
+            {step.title}
+          </h3>
+          <p class="text-[0.9375rem] leading-relaxed text-[var(--color-text-muted)]" {...editAttrs(`${editPath}.steps.${i}.text`)} set:html={step.text}></p>
+        </li>
+      ))}
+    </ol>
+  </div>
+</section>

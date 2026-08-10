@@ -1,0 +1,66 @@
+---
+import Icon from "../Icon.astro";
+import IconBadge from "../IconBadge.astro";
+import BackgroundDecor from "../BackgroundDecor.astro";
+import ContactForm from "../ContactForm.astro";
+import { siteConfig } from "../../config/site";
+import { editAttrs } from "../../lib/edit";
+import { sectionBg } from "../../lib/sections";
+import type { ContactData } from "../../content.config";
+
+interface Props {
+  data: ContactData;
+  editPath: string;
+}
+const { data, editPath } = Astro.props;
+---
+
+<section
+  id={data.id}
+  class:list={["relative overflow-hidden", sectionBg(data.background)]}
+  {...editAttrs(editPath)}
+>
+  <BackgroundDecor variant="spotlight" intensity="subtle" />
+
+  <div class="relative mx-auto max-w-3xl px-4 py-20 text-center sm:px-6 lg:py-28">
+    {data.badge && <IconBadge icon={data.badge.icon} label={data.badge.label} tone={data.badge.tone} editPath={`${editPath}.badge.label`} />}
+    <h2
+      class="mt-4 font-serif text-[length:var(--text-fs-h2)] font-medium leading-tight tracking-tight"
+      {...editAttrs(`${editPath}.title`)}
+    >
+      {data.title}
+    </h2>
+    {data.intro && (
+      <p class="mt-4 text-lg text-[var(--color-text-muted)]" {...editAttrs(`${editPath}.intro`)} set:html={data.intro}></p>
+    )}
+
+    {data.form ? (
+      <div class="mt-12 text-left">
+        <ContactForm
+          messageLabel={data.messageLabel}
+          messagePlaceholder={data.messagePlaceholder}
+          extraFields={data.extraFields ?? []}
+        />
+      </div>
+    ) : (
+      <div class="mx-auto mt-12 max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-8 text-left">
+        <ul class="space-y-4 text-base">
+          <li class="flex items-center gap-3">
+            <Icon name="mail" class="h-5 w-5 shrink-0 text-[var(--color-accent)]" />
+            <a href={`mailto:${siteConfig.contact.email}`} class="no-underline hover:text-[var(--color-accent)]">
+              {siteConfig.contact.email}
+            </a>
+          </li>
+          {siteConfig.contact.phone && (
+            <li class="flex items-center gap-3">
+              <Icon name="phone" class="h-5 w-5 shrink-0 text-[var(--color-accent)]" />
+              <a href={`tel:${siteConfig.contact.phone.replace(/\s/g, "")}`} class="no-underline hover:text-[var(--color-accent)]">
+                {siteConfig.contact.phone}
+              </a>
+            </li>
+          )}
+        </ul>
+      </div>
+    )}
+  </div>
+</section>

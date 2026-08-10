@@ -1,0 +1,18 @@
+{
+  "header": {
+    "links": [
+      { "label": "Oferta", "href": "#oferta" },
+      { "label": "Proces", "href": "#proces" },
+      { "label": "Kontakt", "href": "#kontakt" }
+    ],
+    "cta": { "label": "CTA_LABEL_PLACEHOLDER", "href": "#kontakt" }
+  },
+  "footer": {
+    "tagline": "FOOTER_TAGLINE_PLACEHOLDER",
+    "links": [
+      { "label": "Oferta", "href": "#oferta" },
+      { "label": "Proces", "href": "#proces" },
+      { "label": "Kontakt", "href": "#kontakt" }
+    ]
+  }
+}

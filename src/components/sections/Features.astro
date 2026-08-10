@@ -1,0 +1,44 @@
+---
+import IconBadge from "../IconBadge.astro";
+import FeatureCard from "../FeatureCard.astro";
+import { editAttrs } from "../../lib/edit";
+import { balancedGrid } from "../../lib/grid";
+import { sectionBg } from "../../lib/sections";
+import type { FeaturesData } from "../../content.config";
+
+interface Props {
+  data: FeaturesData;
+  editPath: string;
+}
+const { data, editPath } = Astro.props;
+const grid = balancedGrid(data.items.length);
+---
+
+<section
+  id={data.id}
+  class:list={["border-b border-[var(--color-border)]", sectionBg(data.background)]}
+  {...editAttrs(editPath)}
+>
+  <div class="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+    <div class="max-w-2xl">
+      {data.badge && <IconBadge icon={data.badge.icon} label={data.badge.label} tone={data.badge.tone} editPath={`${editPath}.badge.label`} />}
+      <h2
+        class="mt-4 font-serif text-[length:var(--text-fs-h2)] font-medium leading-tight tracking-tight"
+        {...editAttrs(`${editPath}.title`)}
+      >
+        {data.title}
+      </h2>
+      {data.intro && (
+        <p class="mt-4 text-lg text-[var(--color-text-muted)]" {...editAttrs(`${editPath}.intro`)} set:html={data.intro}></p>
+      )}
+    </div>
+
+    <div class:list={["mt-12 gap-4", grid.container]}>
+      {data.items.map((f, i) => (
+        <div class={grid.item(i)} {...editAttrs(`${editPath}.items.${i}`)}>
+          <FeatureCard icon={f.icon} title={f.title} text={f.text} accent={f.accent} editPath={`${editPath}.items.${i}`} />
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

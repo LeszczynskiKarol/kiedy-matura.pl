@@ -1,0 +1,103 @@
+---
+// Mapa dojazdu Google — CLICK-TO-LOAD (RODO): bez kliknięcia strona nie robi
+// ŻADNEGO requestu do Google. Placeholder (karta z ikoną + przycisk) jest
+// czystym HTML; dopiero klik "Pokaż mapę Google" wstawia <iframe> z data.src.
+// Sekcja "dokuje" bezpośrednio po sekcji kontaktowej (umiejscowienie decyduje
+// brief-compiler), ale jest samodzielna.
+//
+// Ikona map-pin: własny inline SVG (celowo NIE z src/icons/set.ts — komponent
+// samowystarczalny, żeby migracja szablonu nie dotykała per-projektowego set.ts).
+import { editAttrs } from "../../lib/edit";
+import { sectionBg } from "../../lib/sections";
+import type { MapEmbedData } from "../../content.config";
+
+interface Props {
+  data: MapEmbedData;
+  editPath: string;
+}
+const { data, editPath } = Astro.props;
+---
+
+<section
+  id={data.id}
+  class:list={["border-b border-[var(--color-border)]", sectionBg(data.background)]}
+  {...editAttrs(editPath)}
+>
+  <div class="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+    {data.heading && (
+      <h2
+        class="max-w-2xl font-serif text-[length:var(--text-fs-h2)] font-medium leading-tight tracking-tight"
+        {...editAttrs(`${editPath}.heading`)}
+      >
+        {data.heading}
+      </h2>
+    )}
+
+    <div
+      class:list={[
+        "flex h-[320px] items-center justify-center overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] sm:h-[380px]",
+        data.heading && "mt-10",
+      ]}
+      data-map-embed
+      data-map-src={data.src}
+      data-map-title={data.title}
+    >
+      <div class="flex max-w-md flex-col items-center gap-4 px-6 text-center">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          width="36"
+          height="36"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+          class="text-[var(--color-accent)]"
+        >
+          <path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11z" />
+          <circle cx="12" cy="10" r="2.5" />
+        </svg>
+        <p class="text-base font-medium">{data.title}</p>
+        <button
+          type="button"
+          class="needs-js inline-flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-6 py-3 text-sm font-semibold text-[var(--color-text)] transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
+          data-map-load
+        >
+          Pokaż mapę Google
+        </button>
+        <p class="text-xs leading-relaxed text-[var(--color-text-faint)]">
+          Po kliknięciu treść załaduje się z serwerów Google (Mapy Google).
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script is:inline>
+  // Click-to-load mapy Google — RAW JS (NIE owijać w {``}, patrz CLAUDE.md 3.5).
+  // Iframe powstaje wyłącznie po kliknięciu — zero połączeń z Google wcześniej.
+  (function () {
+    document.querySelectorAll("[data-map-load]").forEach(function (btn) {
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = "1";
+      btn.addEventListener("click", function () {
+        var box = btn.closest("[data-map-embed]");
+        if (!box) return;
+        var iframe = document.createElement("iframe");
+        iframe.src = box.getAttribute("data-map-src");
+        iframe.title = box.getAttribute("data-map-title") || "Mapa dojazdu";
+        iframe.loading = "lazy";
+        iframe.setAttribute("allowfullscreen", "");
+        iframe.referrerPolicy = "no-referrer-when-downgrade";
+        iframe.style.border = "0";
+        iframe.style.display = "block";
+        iframe.style.width = "100%";
+        iframe.style.height = "100%";
+        box.textContent = "";
+        box.appendChild(iframe);
+      });
+    });
+  })();
+</script>

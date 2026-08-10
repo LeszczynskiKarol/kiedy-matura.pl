@@ -1,0 +1,47 @@
+---
+// Rejestr sekcji — jedyne miejsce mapujące type → komponent.
+// Per-site nowe typy sekcji: komponent w tym katalogu + wariant unii
+// w src/content.config.ts + wpis w registry poniżej.
+import Hero from "./Hero.astro";
+import Stats from "./Stats.astro";
+import Features from "./Features.astro";
+import Process from "./Process.astro";
+import Faq from "./Faq.astro";
+import Testimonials from "./Testimonials.astro";
+import Gallery from "./Gallery.astro";
+import ContactSection from "./ContactSection.astro";
+import Prose from "./Prose.astro";
+import GoogleReviews from "./GoogleReviews.astro";
+import MapEmbed from "./MapEmbed.astro";
+import type { SectionData } from "../../content.config";
+
+const registry: Record<SectionData["type"], any> = {
+  hero: Hero,
+  stats: Stats,
+  features: Features,
+  process: Process,
+  faq: Faq,
+  testimonials: Testimonials,
+  gallery: Gallery,
+  contact: ContactSection,
+  prose: Prose,
+  googleReviews: GoogleReviews,
+  mapEmbed: MapEmbed,
+};
+
+interface Props {
+  sections: SectionData[];
+  pageId: string;
+}
+const { sections, pageId } = Astro.props;
+---
+
+{sections.map((section, i) => {
+  const Component = registry[section.type];
+  if (!Component) {
+    throw new Error(
+      `Nieznany typ sekcji "${section.type}" na stronie "${pageId}" — dodaj komponent i wpis w SectionRenderer.astro`
+    );
+  }
+  return <Component data={section} editPath={`pages/${pageId}#sections.${i}`} />;
+})}

@@ -1,0 +1,143 @@
+---
+import Icon from "./Icon.astro";
+import Logo from "./Logo.astro";
+import ThemeToggle from "./ThemeToggle.astro";
+import navigation from "../content/navigation.json";
+import { editAttrs } from "../lib/edit";
+
+const { links, cta } = navigation.header;
+---
+
+<header class="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--color-bg)]/85 backdrop-blur">
+  <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+    <Logo />
+    <nav aria-label="Główne" class="hidden items-center gap-6 md:flex" {...editAttrs("navigation#header")}>
+      {links.map((link) => (
+        <a
+          href={link.href}
+          class="text-[0.9375rem] text-[var(--color-text-muted)] no-underline hover:text-[var(--color-text)]"
+        >
+          {link.label}
+        </a>
+      ))}
+      <ThemeToggle />
+      <a
+        href={cta.href}
+        class="inline-flex items-center gap-1.5 rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-[var(--color-accent-fg)] no-underline transition-colors hover:bg-[var(--color-accent-hover)]"
+        {...editAttrs("navigation#header.cta.label")}
+      >
+        {cta.label}
+        <Icon name="arrow-right" class="h-4 w-4" />
+      </a>
+    </nav>
+    <div class="flex items-center gap-2 md:hidden">
+      <ThemeToggle />
+      <button
+        type="button"
+        id="mobile-menu-toggle"
+        class="needs-js inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--color-border)] bg-[var(--color-bg-elevated)] text-[var(--color-text)] transition-colors hover:bg-[var(--color-bg-subtle)]"
+        aria-expanded="false"
+        aria-controls="mobile-menu"
+        aria-label="Otwórz menu"
+      >
+        <Icon name="menu" class="js-icon-open h-5 w-5" />
+        <Icon name="x" class="js-icon-close hidden h-5 w-5" />
+      </button>
+    </div>
+  </div>
+
+  <!-- Panel menu mobilnego: pełnoszerokościowy dropdown pod headerem
+       (header jest position:sticky, więc absolute pozycjonuje się względem niego). -->
+  <div
+    id="mobile-menu"
+    hidden
+    class="absolute inset-x-0 top-full max-h-[calc(100dvh-4rem)] overflow-y-auto border-b border-[var(--color-border)] bg-[var(--color-bg)] md:hidden"
+  >
+    <nav aria-label="Menu mobilne" class="mx-auto flex max-w-6xl flex-col px-4 py-4 sm:px-6">
+      {links.map((link) => (
+        <a
+          href={link.href}
+          class="rounded-md px-3 py-2.5 text-[0.9375rem] text-[var(--color-text-muted)] no-underline transition-colors hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text)]"
+        >
+          {link.label}
+        </a>
+      ))}
+      <a
+        href={cta.href}
+        class="mt-3 inline-flex items-center justify-center gap-1.5 rounded-md bg-[var(--color-accent)] px-4 py-2.5 text-sm font-medium text-[var(--color-accent-fg)] no-underline transition-colors hover:bg-[var(--color-accent-hover)]"
+      >
+        {cta.label}
+        <Icon name="arrow-right" class="h-4 w-4" />
+      </a>
+    </nav>
+  </div>
+</header>
+
+<script is:inline>
+  // Menu mobilne (hamburger). RAW JS — NIGDY nie owijaj treści tego skryptu
+  // w {`...`} (anty-pattern z CLAUDE.md §3.5: template-literal ląduje dosłownie
+  // w HTML i skrypt staje się no-opem).
+  (function () {
+    var btn = document.getElementById("mobile-menu-toggle");
+    var panel = document.getElementById("mobile-menu");
+    if (!btn || !panel) return;
+
+    var iconOpen = btn.querySelector(".js-icon-open");
+    var iconClose = btn.querySelector(".js-icon-close");
+    var openedAtY = 0;
+
+    function isOpen() {
+      return btn.getAttribute("aria-expanded") === "true";
+    }
+
+    function setOpen(open) {
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      btn.setAttribute("aria-label", open ? "Zamknij menu" : "Otwórz menu");
+      if (open) panel.removeAttribute("hidden");
+      else panel.setAttribute("hidden", "");
+      if (iconOpen) iconOpen.classList.toggle("hidden", open);
+      if (iconClose) iconClose.classList.toggle("hidden", !open);
+      // BEZ scroll-locka (v33): overflow:hidden na html LUB body zabija
+      // position:sticky (zmierzone na produkcji 2026-07-17 — header ucieka
+      // na górę dokumentu). Zamiast blokować scroll: menu zamyka się samo,
+      // gdy user przewinie stronę (listener niżej).
+      if (open) openedAtY = window.scrollY;
+    }
+
+    btn.addEventListener("click", function () {
+      setOpen(!isOpen());
+    });
+
+    // Menu zamyka się przy przewinięciu strony (próg 80px — ignoruje drobne
+    // drgnięcia iOS); strona pozostaje scrollowalna z otwartym menu.
+    window.addEventListener(
+      "scroll",
+      function () {
+        if (isOpen() && Math.abs(window.scrollY - openedAtY) > 80) setOpen(false);
+      },
+      { passive: true }
+    );
+
+    // Zamknij po kliknięciu linku w panelu (kotwice #sekcja na tej samej stronie).
+    panel.addEventListener("click", function (e) {
+      var link = e.target && e.target.closest ? e.target.closest("a") : null;
+      if (link) setOpen(false);
+    });
+
+    // Escape zamyka i zwraca focus na przycisk.
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && isOpen()) {
+        setOpen(false);
+        btn.focus();
+      }
+    });
+
+    // Sprzątanie przy resize do desktopu (md = 768px): zamknij i zdejmij scroll-lock.
+    var mq = window.matchMedia("(min-width: 768px)");
+    function onBreakpoint(ev) {
+      if (ev.matches && isOpen()) setOpen(false);
+    }
+    if (typeof mq.addEventListener === "function") mq.addEventListener("change", onBreakpoint);
+    else if (typeof mq.addListener === "function") mq.addListener(onBreakpoint);
+  })();
+</script>

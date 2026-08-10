@@ -1,0 +1,55 @@
+---
+import Icon from "../Icon.astro";
+import IconBadge from "../IconBadge.astro";
+import { editAttrs } from "../../lib/edit";
+import { sectionBg } from "../../lib/sections";
+import type { FaqData } from "../../content.config";
+
+interface Props {
+  data: FaqData;
+  editPath: string;
+}
+const { data, editPath } = Astro.props;
+---
+
+<section
+  id={data.id}
+  class:list={["border-b border-[var(--color-border)]", sectionBg(data.background)]}
+  {...editAttrs(editPath)}
+>
+  <div class="mx-auto max-w-3xl px-4 py-20 sm:px-6 lg:py-28">
+    <div class="max-w-2xl">
+      {data.badge && <IconBadge icon={data.badge.icon} label={data.badge.label} tone={data.badge.tone} editPath={`${editPath}.badge.label`} />}
+      <h2
+        class="mt-4 font-serif text-[length:var(--text-fs-h2)] font-medium leading-tight tracking-tight"
+        {...editAttrs(`${editPath}.title`)}
+      >
+        {data.title}
+      </h2>
+      {data.intro && (
+        <p class="mt-4 text-lg text-[var(--color-text-muted)]" {...editAttrs(`${editPath}.intro`)} set:html={data.intro}></p>
+      )}
+    </div>
+
+    <div class="mt-10 space-y-3">
+      {data.items.map((item, i) => (
+        <details
+          class="group rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)]"
+          {...editAttrs(`${editPath}.items.${i}`)}
+        >
+          <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-4 text-base font-medium [&::-webkit-details-marker]:hidden">
+            <span {...editAttrs(`${editPath}.items.${i}.q`)}>{item.q}</span>
+            <Icon
+              name="chevron-down"
+              class="h-4 w-4 shrink-0 text-[var(--color-text-faint)] transition-transform group-open:rotate-180"
+            />
+          </summary>
+          <p
+            class="px-6 pb-5 text-[0.9375rem] leading-relaxed text-[var(--color-text-muted)]"
+            {...editAttrs(`${editPath}.items.${i}.a`)}
+           set:html={item.a}></p>
+        </details>
+      ))}
+    </div>
+  </div>
+</section>

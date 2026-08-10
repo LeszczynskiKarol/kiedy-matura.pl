@@ -1,0 +1,30 @@
+---
+import StatBlock from "../StatBlock.astro";
+import { editAttrs } from "../../lib/edit";
+import { balancedGrid } from "../../lib/grid";
+import { sectionBg } from "../../lib/sections";
+import type { StatsData } from "../../content.config";
+
+interface Props {
+  data: StatsData;
+  editPath: string;
+}
+const { data, editPath } = Astro.props;
+// StatBlocki są kompaktowe: 2 kolumny już na mobile, a 4 sztuki w jednym
+// rzędzie na lg (fourAcross) zamiast 2-2 jak przy pełnowymiarowych kartach.
+const grid = balancedGrid(data.items.length, { mobileCols: 2, fourAcross: true });
+---
+
+<section
+  id={data.id}
+  class:list={["border-b border-[var(--color-border)]", sectionBg(data.background)]}
+  {...editAttrs(editPath)}
+>
+  <div class:list={["mx-auto max-w-6xl gap-x-6 gap-y-8 px-4 py-12 sm:px-6 lg:px-8", grid.container]}>
+    {data.items.map((s, i) => (
+      <div class={grid.item(i)} {...editAttrs(`${editPath}.items.${i}`)}>
+        <StatBlock value={s.value} label={s.label} accent={s.accent} editPath={`${editPath}.items.${i}`} />
+      </div>
+    ))}
+  </div>
+</section>

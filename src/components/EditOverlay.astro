@@ -1,0 +1,1142 @@
+---
+// Overlay edycji in-place (tier 1 "Wix feel" → Edytor 3.0 "live insert") —
+// renderowany TYLKO w buildach edit-preview (PUBLIC_EDIT_PREVIEW=1). Strona
+// osadzana jest w iframe edytora Sitario; komunikacja przez postMessage:
+//   → parent: { sitarioEdit: true, type: "change", path, value }
+//   → parent: { sitarioEdit: true, type: "ready", paths: [...] }
+//   → parent: { sitarioEdit: true, type: "add-section", page, beforeIndex }
+//   → parent: { sitarioEdit: true, type: "add-item", page, sectionIndex }
+//   → parent: { sitarioEdit: true, type: "remove-section", page, index }
+//   → parent: { sitarioEdit: true, type: "remove-item", page, sectionIndex, itemIndex }
+//   → parent: { sitarioEdit: true, type: "ai-edit", page, path, label }
+//         → celowana edycja AI: pigułka "✨ AI" na hover sekcji; `path` = surowy
+//           data-edit HOST-a sekcji (1:1), `label` = tekst nagłówka sekcji
+//   ← od parenta:
+//     { type: "hide-section", page, index }                    → display:none sekcji
+//     { type: "hide-item", page, sectionIndex, itemIndex }     → display:none elementu
+//     { type: "insert-item-dom", page, sectionBuild, alias, texts }
+//         → klon ostatniego elementu listy, data-edit przepisane na alias,
+//           teksty liści podmienione, od razu EDYTOWALNY (3.0)
+//     { type: "insert-section-dom", page, beforeBuild, alias, sectionType,
+//       donorBuild, texts, listKey, listCount }
+//         → klon sekcji-donora tego samego typu (przycięta/zduplikowana lista,
+//           teksty z prefillu) ALBO generyczny markup na tokenach strony,
+//           wstawiony przed beforeBuild — od razu edytowalny (3.0)
+//
+// KLUCZE: `page` = prefiks data-edit przed "#". Indeksy sekcji/elementów to
+// klucze w przestrzeni BUILD-indeksów: liczby z data-edit z chwili builda
+// ALBO aliasy "n<seq>" nadawane przez panel elementom wstawionym na żywo.
+// Przy świeżym loadzie (po rebuildzie) aliasy znikają — wszystko ma numery.
+// Przeliczanie klucz→bieżąca pozycja w stanie robi WYŁĄCZNIE panel.
+//
+// Edytor 3.0 (decyzja Karola 2026-07-11): nowa sekcja/element pojawia się
+// NATYCHMIAST jako edytowalny klon DOM ("wstawiam i edytuję OD RAZU,
+// a na końcu zatwierdzam") — prawdziwy render powstaje przy publikacji.
+// Galeria ŚWIADOMIE poza live-insertem (flow przez manager w panelu).
+// Guardraile (hero nieusuwalny, kontakt na końcu, minima/maxima zod) — panel.
+---
+
+<style is:inline>
+  [data-sitario-editable] {
+    outline: 1.5px dashed transparent;
+    outline-offset: 3px;
+    transition: outline-color 120ms ease;
+    cursor: text;
+  }
+  [data-sitario-editable]:hover {
+    outline-color: rgba(79, 70, 229, 0.75);
+  }
+  [data-sitario-editable]:focus {
+    outline: 2px solid rgba(79, 70, 229, 0.95);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  #sitario-edit-badge {
+    position: fixed;
+    bottom: 14px;
+    right: 14px;
+    z-index: 99999;
+    background: linear-gradient(135deg, #4f46e5, #9333ea);
+    color: #fff;
+    font: 600 12px/1 system-ui, sans-serif;
+    padding: 8px 12px;
+    border-radius: 999px;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+    pointer-events: none;
+  }
+  /* Host stref "+" / pigułek — position:relative tylko gdy computed było static */
+  .sitario-pos-rel {
+    position: relative !important;
+  }
+  /* Strefa hover na granicy sekcji: przezroczysty pasek ~28px; na hover
+     linia akcentowa + wyśrodkowana pigułka "＋ Dodaj sekcję". */
+  .sitario-add-zone {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 28px;
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+  }
+  .sitario-add-zone[data-edge="top"] {
+    top: -14px;
+  }
+  .sitario-add-zone[data-edge="bottom"] {
+    bottom: -14px;
+  }
+  .sitario-add-zone::before {
+    content: "";
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    top: 50%;
+    height: 2px;
+    margin-top: -1px;
+    border-radius: 1px;
+    background: linear-gradient(90deg, #4f46e5, #9333ea);
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+  .sitario-add-pill {
+    position: relative;
+    z-index: 1;
+    opacity: 0;
+    transform: scale(0.94);
+    transition: opacity 120ms ease, transform 120ms ease;
+    background: linear-gradient(135deg, #4f46e5, #9333ea);
+    color: #fff;
+    font: 600 12px/1 system-ui, sans-serif;
+    padding: 7px 14px;
+    border-radius: 999px;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .sitario-add-zone:hover::before,
+  .sitario-add-zone:focus-visible::before {
+    opacity: 1;
+  }
+  .sitario-add-zone:hover .sitario-add-pill,
+  .sitario-add-zone:focus-visible .sitario-add-pill {
+    opacity: 1;
+    transform: scale(1);
+  }
+  /* Kafelek "＋ Dodaj element" za ostatnim elementem listy (items/steps) —
+     jako rodzeństwo elementów listy wpada w ich grid/stack. */
+  .sitario-add-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 56px;
+    padding: 12px 16px;
+    border: 2px dashed rgba(79, 70, 229, 0.45);
+    border-radius: 12px;
+    background: rgba(79, 70, 229, 0.06);
+    color: #4f46e5;
+    font: 600 13px/1 system-ui, sans-serif;
+    cursor: pointer;
+    transition: background 120ms ease, border-color 120ms ease;
+  }
+  .sitario-add-item:hover,
+  .sitario-add-item:focus-visible {
+    background: rgba(79, 70, 229, 0.14);
+    border-color: rgba(79, 70, 229, 0.8);
+  }
+  /* Pigułka "✕ Usuń sekcję" — prawy górny róg sekcji, widoczna na hover
+     sekcji (styl spójny z pigułkami add, wariant rose). */
+  .sitario-remove-pill {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    z-index: 9997;
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.94);
+    transition: opacity 120ms ease, transform 120ms ease;
+    background: linear-gradient(135deg, #f43f5e, #be123c);
+    color: #fff;
+    font: 600 12px/1 system-ui, sans-serif;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 0;
+    box-shadow: 0 4px 14px rgba(225, 29, 72, 0.4);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .sitario-sec-host:hover > .sitario-remove-pill,
+  .sitario-remove-pill:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: scale(1);
+  }
+  /* Pigułka "✨ AI" — drugi wiersz pod "✕ Usuń sekcję" w prawym górnym rogu
+     sekcji, widoczna na hover sekcji. Ten sam rozmiar/typografia/z-index co
+     remove-pill; wariant akcentowy (gradient jak pigułki add) = akcja AI. */
+  .sitario-ai-pill {
+    position: absolute;
+    top: 44px;
+    right: 12px;
+    z-index: 9997;
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.94);
+    transition: opacity 120ms ease, transform 120ms ease;
+    background: linear-gradient(135deg, #4f46e5, #9333ea);
+    color: #fff;
+    font: 600 12px/1 system-ui, sans-serif;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 0;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .sitario-sec-host:hover > .sitario-ai-pill,
+  .sitario-ai-pill:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: scale(1);
+  }
+  /* Hero nie ma pigułki "✕ Usuń", więc górny slot jest wolny — ✨ AI idzie
+     na samą górę (wyraźniej; feedback 2026-07-14: "brakuje mi edycji AI hero"). */
+  .sitario-sec-host[data-hero] > .sitario-ai-pill { top: 10px; }
+  /* Pigułka "🖼 Zmień grafikę" — TYLKO hero (nie usuwalne). Zajmuje górny
+     slot (top:10) skoro hero nie ma ✕; AI pin schodzi pod nią (top:44). */
+  .sitario-hero-pill {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    z-index: 9998;
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.94);
+    transition: opacity 120ms ease, transform 120ms ease;
+    background: linear-gradient(135deg, #0ea5e9, #6366f1);
+    color: #fff;
+    font: 600 12px/1 system-ui, sans-serif;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 0;
+    box-shadow: 0 4px 14px rgba(14, 165, 233, 0.4);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .sitario-sec-host:hover > .sitario-hero-pill,
+  .sitario-hero-pill:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: scale(1);
+  }
+  /* "🖼 Zmień logo" (v30): pigułka przy logo w headerze — jak hero pill,
+     ale wysunięta w prawo od anchora (logo jest małe, pill by je zasłonił). */
+  .sitario-logo-host { position: relative; }
+  .sitario-logo-pill {
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%) scale(0.94);
+    z-index: 9998;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease, transform 120ms ease;
+    background: linear-gradient(135deg, #0ea5e9, #6366f1);
+    color: #fff;
+    font: 600 12px/1 system-ui, sans-serif;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 0;
+    box-shadow: 0 4px 14px rgba(14, 165, 233, 0.4);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .sitario-logo-host:hover > .sitario-logo-pill,
+  .sitario-logo-pill:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(-50%) scale(1);
+  }
+  /* "🖼 Zmień grafikę" NA samej grafice hero: wyśrodkowany przycisk +
+     subtelne przyciemnienie grafiki na hover (feedback 2026-07-14). */
+  .sitario-hero-media { position: relative; }
+  .sitario-hero-media::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    background: rgba(15, 23, 42, 0);
+    transition: background 140ms ease;
+    pointer-events: none;
+    z-index: 9996;
+  }
+  .sitario-hero-media:hover::after { background: rgba(15, 23, 42, 0.28); }
+  .sitario-hero-pill-on {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 9998;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -50%) scale(0.94);
+    transition: opacity 140ms ease, transform 140ms ease;
+    background: linear-gradient(135deg, #0ea5e9, #6366f1);
+    color: #fff;
+    font: 600 13px/1 system-ui, sans-serif;
+    padding: 10px 16px;
+    border-radius: 999px;
+    border: 0;
+    box-shadow: 0 6px 20px rgba(2, 6, 23, 0.45);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .sitario-hero-media:hover > .sitario-hero-pill-on,
+  .sitario-hero-pill-on:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  /* Flash zaznaczonej/edytowanej sekcji — outline (nie klipowany przez
+     overflow-hidden sekcji), 2 pulsy i zanik. */
+  @keyframes sitarioFlash {
+    0%   { outline-color: rgba(79, 70, 229, 0.95); }
+    25%  { outline-color: rgba(79, 70, 229, 0.12); }
+    55%  { outline-color: rgba(79, 70, 229, 0.95); }
+    100% { outline-color: rgba(79, 70, 229, 0); }
+  }
+  .sitario-flash {
+    outline: 3px solid rgba(79, 70, 229, 0.95);
+    outline-offset: 3px;
+    border-radius: 6px;
+    animation: sitarioFlash 2.4s ease-out forwards;
+  }
+  /* Kółko "✕" — róg elementu listy (items/steps), widoczne na hover */
+  .sitario-remove-item {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 9997;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    border: 0;
+    background: #e11d48;
+    color: #fff;
+    font: 700 12px/1 system-ui, sans-serif;
+    box-shadow: 0 2px 8px rgba(225, 29, 72, 0.45);
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+  }
+  /* descendant (nie child) — w <details> (FAQ) przycisk siedzi w <summary>,
+     bo dzieci details poza summary nie renderują się przy zwiniętym stanie */
+  .sitario-item-host:hover .sitario-remove-item,
+  .sitario-remove-item:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* Dyskretny badge na sekcji zbudowanej generycznie (bez donora) — klon
+     jest przybliżeniem, prawdziwy wygląd powstaje przy publikacji (3.0). */
+  .sitario-approx-badge {
+    position: absolute;
+    right: 12px;
+    bottom: 10px;
+    z-index: 9996;
+    font: 500 11px/1 system-ui, sans-serif;
+    color: #6366f1;
+    background: rgba(79, 70, 229, 0.08);
+    border: 1px dashed rgba(79, 70, 229, 0.4);
+    padding: 4px 9px;
+    border-radius: 999px;
+    pointer-events: none;
+  }
+</style>
+
+<div id="sitario-edit-badge">✏️ Tryb edycji — klikaj teksty i plusy</div>
+
+<script is:inline>
+  (function () {
+    // Klucz sekcji/elementu: build-index ("0","1"…) albo alias panelu ("n1").
+    var KEY = "(\\d+|n\\d+)";
+    var reSection = new RegExp("^(pages\\/[^#]+)#sections\\." + KEY + "$");
+    var reItem = new RegExp("^pages\\/[^#]+#sections\\." + KEY + "\\.(items|steps)\\." + KEY + "$");
+    var reKeyOk = new RegExp("^" + KEY + "$");
+
+    var editable = [];
+    var pageId = "pages/index";
+
+    function postUp(msg) {
+      msg.sitarioEdit = true;
+      parent.postMessage(msg, "*");
+    }
+    function findEdit(path) {
+      return document.querySelector('[data-edit="' + String(path).replace(/["\\]/g, "") + '"]');
+    }
+    function isLeafKey(path) {
+      var last = String(path).split(/[.#]/).pop();
+      return !reKeyOk.test(last); // kończy się kluczem = obiekt listy, nie string
+    }
+
+    // ── wire-editable (REUŻYWALNE — także dla klonów z live-insertu) ─────
+    // Liście [data-edit] pod root (i sam root) → contenteditable + "change".
+    function wireEditable(root) {
+      // Ikony kart (v36): [data-icon-edit] → klik otwiera picker ikon w panelu
+      // (własny zestaw strony z src/icons/set.ts — spójność, zero bibliotek).
+      (root.querySelectorAll ? root.querySelectorAll("[data-icon-edit]") : []).forEach(function (ic) {
+        if (ic.hasAttribute("data-sitario-icon-wired")) return;
+        ic.setAttribute("data-sitario-icon-wired", "");
+        ic.style.cursor = "pointer";
+        ic.title = "Zmień ikonę";
+        ic.addEventListener("mouseenter", function () { ic.style.boxShadow = "0 0 0 2px var(--color-accent)"; });
+        ic.addEventListener("mouseleave", function () { ic.style.boxShadow = ""; });
+        ic.addEventListener("click", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          postUp({ type: "icon-edit", page: pageId, path: ic.getAttribute("data-icon-edit") });
+        });
+      });
+      var els = [];
+      if (root.getAttribute && root.getAttribute("data-edit")) els.push(root);
+      root.querySelectorAll("[data-edit]").forEach(function (el) { els.push(el); });
+      els.forEach(function (el) {
+        if (el.querySelector("[data-edit]")) return; // nie-liść
+        if (el.hasAttribute("data-sitario-wired")) return; // idempotencja (re-wire klonów)
+        var path = el.getAttribute("data-edit");
+        if (!isLeafKey(path)) return; // obiekt (element listy), nie string
+        el.setAttribute("data-sitario-wired", "");
+        el.setAttribute("data-sitario-editable", "");
+        // Pola .html (sekcja prose) edytujemy jako HTML — plaintext-only
+        // spłaszczał set:html do gołego tekstu i KASOWAŁ istniejące linki,
+        // nagłówki i listy przy pierwszym wpisanym znaku (bug wykryty przy
+        // feature "linki w treści", 2026-07-30). Wartość dla prose = innerHTML;
+        // backend sanityzuje przy zapisie (checkHtml w PUT /content).
+        // v42: nie tylko prose — pola treści (intro, opisy kart, odpowiedzi
+        // FAQ, podtytuły...) renderują się przez set:html, więc dostają pełną
+        // edycję HTML + chmurkę link/B/I. Lista kluczy = whitelist zgodna z
+        // sanitizerem backendu (htmlSanitize.mjs) i panelem (EditorPage Leaf).
+        var isHtmlField = /\.html$/.test(path) || path === "html";
+        if (!isHtmlField && /\.(intro|text|description|subtitle|lead|desc|body|quote|a)$/.test(path)) {
+          // Rich-text TYLKO gdy host zawiera samą treść inline. Host ze
+          // strukturą (np. ikona+akapit w nocie stats) zostaje plaintext —
+          // spójnie z komponentem, który tam nadal renderuje escapowane;
+          // innerHTML zassałby SVG ikony do zapisywanej wartości.
+          isHtmlField = !el.querySelector("*:not(a):not(b):not(strong):not(i):not(em):not(u):not(s):not(br):not(span):not(mark):not(small):not(code)");
+        }
+        el.setAttribute("contenteditable", isHtmlField ? "true" : "plaintext-only");
+        el.setAttribute("spellcheck", "false");
+        editable.push(path);
+
+        el.addEventListener("input", function () {
+          postUp({
+            type: "change",
+            path: el.getAttribute("data-edit"),
+            value: isHtmlField ? el.innerHTML : el.innerText,
+          });
+        });
+        // Enter = zakończ edycję (bez łamania struktury); w polu HTML Enter
+        // normalnie łamie akapit — tam edycję kończy klik poza sekcją.
+        el.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" && !e.shiftKey && !isHtmlField) {
+            e.preventDefault();
+            el.blur();
+          }
+        });
+        // Nie nawiguj po klikach w edytowalne linki/przyciski (także linki
+        // WEWNĄTRZ pola HTML — inaczej edycja prose z <a> wyrzucałaby z edytora)
+        el.addEventListener("click", function (e) {
+          if (el.closest("a")) e.preventDefault();
+          if (isHtmlField && e.target && e.target.closest && e.target.closest("a")) e.preventDefault();
+        });
+      });
+    }
+
+    // ── chmurka nad zaznaczeniem w polach HTML (prose): Link / B / I ─────
+    // (feedback 2026-07-30: samo contenteditable nie daje ŻADNEJ drogi do
+    // wstawienia linku — wzorzec Medium/Notion: zaznacz → pływający pasek).
+    // execCommand jest deprecated, ale działa wszędzie i sam emituje "input",
+    // więc zmiana leci do panelu istniejącą ścieżką postUp(innerHTML).
+    var selBar = null;
+    function fmtAction(cmd) {
+      if (cmd === "link") {
+        var url = window.prompt("Adres linku (https://… albo /podstrona):");
+        if (!url) return;
+        if (!/^(https?:\/\/|\/|mailto:|tel:|#)/i.test(url)) url = "https://" + url;
+        document.execCommand("createLink", false, url);
+      } else if (cmd === "unlink") {
+        document.execCommand("unlink");
+      } else {
+        document.execCommand(cmd); // bold / italic
+      }
+    }
+    function ensureSelBar() {
+      if (selBar) return selBar;
+      selBar = document.createElement("div");
+      selBar.setAttribute("data-sitario-selbar", "");
+      selBar.style.cssText =
+        "position:fixed;z-index:2147483647;display:none;gap:2px;align-items:center;" +
+        "background:#111827;border-radius:10px;padding:4px;box-shadow:0 8px 24px rgba(0,0,0,.35);";
+      [
+        ["🔗", "link", "Wstaw link"],
+        ["B", "bold", "Pogrubienie"],
+        ["I", "italic", "Kursywa"],
+        ["⌫🔗", "unlink", "Usuń link"],
+      ].forEach(function (def) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = def[0];
+        b.title = def[2];
+        b.style.cssText =
+          "all:unset;cursor:pointer;color:#fff;font:600 13px/1 system-ui;padding:6px 9px;" +
+          "border-radius:7px;" + (def[1] === "italic" ? "font-style:italic;" : "");
+        b.addEventListener("mouseenter", function () { b.style.background = "#374151"; });
+        b.addEventListener("mouseleave", function () { b.style.background = ""; });
+        // mousedown preventDefault — klik nie może zgubić zaznaczenia
+        b.addEventListener("mousedown", function (e) { e.preventDefault(); });
+        b.addEventListener("click", function (e) {
+          e.preventDefault();
+          fmtAction(def[1]);
+        });
+        selBar.appendChild(b);
+      });
+      document.body.appendChild(selBar);
+      return selBar;
+    }
+    function updateSelBar() {
+      var sel = window.getSelection();
+      var bar = ensureSelBar();
+      if (!sel || sel.isCollapsed || !sel.rangeCount) { bar.style.display = "none"; return; }
+      var node = sel.anchorNode;
+      var elNode = node && (node.nodeType === 1 ? node : node.parentElement);
+      var host = elNode && elNode.closest && elNode.closest("[data-sitario-editable]");
+      // Tylko pola HTML (prose) — w plaintext-only formatowanie nie ma sensu
+      if (!host || host.getAttribute("contenteditable") !== "true") { bar.style.display = "none"; return; }
+      var rect = sel.getRangeAt(0).getBoundingClientRect();
+      if (!rect || (!rect.width && !rect.height)) { bar.style.display = "none"; return; }
+      bar.style.display = "flex";
+      var top = rect.top - bar.offsetHeight - 8;
+      if (top < 4) top = rect.bottom + 8; // przy górnej krawędzi — pod spodem
+      bar.style.top = top + "px";
+      bar.style.left = Math.max(4, Math.min(window.innerWidth - bar.offsetWidth - 4, rect.left + rect.width / 2 - bar.offsetWidth / 2)) + "px";
+    }
+    document.addEventListener("selectionchange", function () {
+      // rAF: selectionchange strzela w trakcie przeciągania — pozycjonuj po klatce
+      requestAnimationFrame(updateSelBar);
+    });
+    window.addEventListener("scroll", function () { if (selBar) selBar.style.display = "none"; }, true);
+
+    // ── kontrolki strukturalne (REUŻYWALNE dla klonów) ───────────────────
+    function ensureRel(host) {
+      if (getComputedStyle(host).position === "static") host.classList.add("sitario-pos-rel");
+    }
+
+    function addZone(host, edge, beforeKey) {
+      ensureRel(host);
+      var zone = document.createElement("button");
+      zone.type = "button";
+      zone.className = "sitario-add-zone";
+      zone.setAttribute("data-edge", edge);
+      zone.setAttribute("aria-label", "Dodaj sekcję");
+      var pill = document.createElement("span");
+      pill.className = "sitario-add-pill";
+      pill.textContent = "＋ Dodaj sekcję";
+      zone.appendChild(pill);
+      zone.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        postUp({ type: "add-section", page: pageId, beforeIndex: beforeKey });
+      });
+      host.appendChild(zone);
+    }
+
+    function addRemovePill(host, key) {
+      ensureRel(host);
+      host.classList.add("sitario-sec-host");
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "sitario-remove-pill";
+      btn.setAttribute("aria-label", "Usuń sekcję");
+      btn.textContent = "✕ Usuń sekcję";
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        postUp({ type: "remove-section", page: pageId, index: key });
+      });
+      host.appendChild(btn);
+    }
+
+    // Krótki, ludzki opis sekcji dla panelu AI: pierwszy niepusty nagłówek
+    // (h1/h2/h3) przycięty do ~60 znaków; fallback: id sekcji, inaczej "sekcja".
+    function sectionLabelOf(host) {
+      var h = host.querySelector("h1, h2, h3");
+      var t = h && h.textContent ? h.textContent.replace(/\s+/g, " ").trim() : "";
+      if (t) return t.length > 60 ? t.slice(0, 60).trim() + "…" : t;
+      var id = host.getAttribute("id");
+      if (id) return id;
+      return "sekcja";
+    }
+
+    function addAiPill(host, key) {
+      ensureRel(host);
+      host.classList.add("sitario-sec-host");
+      // path = surowy data-edit HOST-a (1:1); fallback tylko gdy brak atrybutu.
+      var path = (host.getAttribute && host.getAttribute("data-edit")) || (pageId + "#sections." + key);
+      var page = String(path).split("#")[0];
+      var label = sectionLabelOf(host);
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "sitario-ai-pill";
+      btn.setAttribute("aria-label", "Poproś AI o zmianę tej sekcji");
+      btn.textContent = "✨ AI";
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        postUp({ type: "ai-edit", page: page, path: path, label: label });
+      });
+      host.appendChild(btn);
+    }
+
+    function wireSectionControls(host, key) {
+      // Hero (data-hero) = NIE usuwalne (usunięcie rozwala layout — to
+      // otwarcie strony) i bez strefy "wstaw przed" (hero musi być pierwsze).
+      // Zamiast ✕ → dedykowany "🖼 Zmień grafikę" (podmiana SVG/zdjęcia).
+      var isHero = host.getAttribute && host.getAttribute("data-hero");
+      if (isHero) {
+        addHeroImagePill(host, key);
+      } else {
+        addZone(host, "top", key); // strefa nad sekcją = wstaw PRZED nią
+        addRemovePill(host, key);
+      }
+      addAiPill(host, key);
+    }
+
+    function addHeroImagePill(host, key) {
+      host.classList.add("sitario-sec-host");
+      // Przycisk NA samej grafice (data-hero-media), nie w rogu sekcji
+      // (feedback Karola 2026-07-14). Fallback: róg sekcji, gdy brak markera.
+      var media = host.querySelector && host.querySelector("[data-hero-media]");
+      var target = media || host;
+      ensureRel(target);
+      if (media) target.classList.add("sitario-hero-media");
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = media ? "sitario-hero-pill-on" : "sitario-hero-pill";
+      btn.setAttribute("aria-label", "Zmień grafikę / zdjęcie hero");
+      btn.textContent = "🖼 Zmień grafikę";
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        postUp({ type: "hero-image", page: pageId, path: host.getAttribute("data-edit") });
+      });
+      target.appendChild(btn);
+    }
+
+    function wireItem(el, secKey, itemKey) {
+      ensureRel(el);
+      el.classList.add("sitario-item-host");
+      var rm = document.createElement("button");
+      rm.type = "button";
+      rm.className = "sitario-remove-item";
+      rm.setAttribute("aria-label", "Usuń element");
+      rm.textContent = "✕";
+      rm.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        postUp({ type: "remove-item", page: pageId, sectionIndex: secKey, itemIndex: itemKey });
+      });
+      // <details> (FAQ): dzieci poza <summary> nie renderują się przy
+      // zwiniętym stanie — przycisk wkładamy do summary.
+      var rmHost = el.tagName === "DETAILS" ? el.querySelector("summary") || el : el;
+      rmHost.appendChild(rm);
+    }
+
+    function addItemButton(afterEl, secKey) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "sitario-add-item";
+      btn.textContent = "＋ Dodaj element";
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        postUp({ type: "add-item", page: pageId, sectionIndex: secKey });
+      });
+      afterEl.insertAdjacentElement("afterend", btn);
+    }
+
+    // ── narzędzia klonów (3.0) ───────────────────────────────────────────
+    // Klon nie kopiuje listenerów; kopiuje za to atrybuty i przyciski
+    // overlaya — wszystko zdejmujemy i wire'ujemy od zera.
+    function cleanClone(root) {
+      root.querySelectorAll(
+        ".sitario-add-zone, .sitario-remove-pill, .sitario-remove-item, .sitario-add-item, .sitario-approx-badge"
+      ).forEach(function (el) { el.remove(); });
+      var all = [root];
+      root.querySelectorAll("*").forEach(function (el) { all.push(el); });
+      all.forEach(function (el) {
+        el.removeAttribute("data-sitario-wired");
+        el.removeAttribute("data-sitario-editable");
+        el.removeAttribute("contenteditable");
+        el.classList.remove("sitario-sec-host", "sitario-item-host");
+      });
+      root.removeAttribute("id"); // nie duplikuj kotwic (#kontakt itp.)
+    }
+
+    // Przepisz data-edit z prefiksu donora na prefiks aliasowy (root + zejście).
+    function rewritePrefix(root, oldP, newP) {
+      var els = [root];
+      root.querySelectorAll("[data-edit]").forEach(function (el) { els.push(el); });
+      els.forEach(function (el) {
+        var a = el.getAttribute && el.getAttribute("data-edit");
+        if (!a) return;
+        if (a === oldP) el.setAttribute("data-edit", newP);
+        else if (a.indexOf(oldP + ".") === 0) el.setAttribute("data-edit", newP + a.slice(oldP.length));
+      });
+    }
+
+    // Podmień teksty liści klona na prefill panelu (klucze relatywne do
+    // prefiksu). Liść spoza prefillu (np. badge donora, którego nowa sekcja
+    // w STANIE nie ma) traci data-edit — edycja czegoś, czego nie ma w JSON,
+    // przepadałaby cicho przy publikacji.
+    function applyTexts(root, prefix, texts) {
+      if (!texts) return;
+      var els = [root];
+      root.querySelectorAll("[data-edit]").forEach(function (el) { els.push(el); });
+      els.forEach(function (el) {
+        var a = el.getAttribute && el.getAttribute("data-edit");
+        if (!a || el.querySelector("[data-edit]")) return;
+        if (a.indexOf(prefix + ".") !== 0) return;
+        var rel = a.slice(prefix.length + 1);
+        if (!isLeafKey(a)) return; // wrapper elementu listy — zostaje
+        if (!Object.prototype.hasOwnProperty.call(texts, rel)) {
+          el.removeAttribute("data-edit");
+          return;
+        }
+        if (rel === "html" || /\.html$/.test(rel)) el.innerHTML = texts[rel]; // prose: zaufany prefill panelu
+        else el.innerText = texts[rel];
+      });
+    }
+
+    // Fidelity-fallback (features/stats): niektóre komponenty mają data-edit
+    // TYLKO na wrapperze elementu (bez liści w środku) — klon pokazywałby
+    // teksty donora bez możliwości edycji. Panel śle donorTexts (wartości
+    // donora ze STANU); szukamy w klonie elementu bez dzieci o dokładnie tym
+    // tekście, nadajemy mu data-edit i podmieniamy na prefill.
+    function forceEditLeaf(scope, path, newValue, donorValue) {
+      if (typeof donorValue !== "string" || !donorValue.trim()) return;
+      if (scope.querySelector('[data-edit="' + String(path).replace(/["\\]/g, "") + '"]')) return;
+      var all = scope.querySelectorAll("*");
+      for (var i = 0; i < all.length; i++) {
+        var el = all[i];
+        if (el.getAttribute("data-edit")) continue;
+        if (el.children.length) continue; // tylko czyste liście tekstowe
+        if ((el.textContent || "").trim() !== donorValue.trim()) continue;
+        el.setAttribute("data-edit", path);
+        el.innerText = newValue;
+        return;
+      }
+    }
+
+    // Wrappery elementów listy sekcji o danym prefiksie (kolejność DOM).
+    // scope: document (domyślnie) albo ODŁĄCZONY klon (przed wpięciem do DOM).
+    function itemWrappersOf(prefix, scope) {
+      var out = [];
+      var re = new RegExp("^" + prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\.(items|steps)\\." + KEY + "$");
+      (scope || document).querySelectorAll("[data-edit]").forEach(function (el) {
+        if (re.test(el.getAttribute("data-edit") || "")) out.push(el);
+      });
+      return out;
+    }
+
+    function lastVisibleSectionEl() {
+      var last = null;
+      document.querySelectorAll("[data-edit]").forEach(function (el) {
+        if (reSection.test(el.getAttribute("data-edit") || "") && el.style.display !== "none") last = el;
+      });
+      return last;
+    }
+
+    // Wire całego klona sekcji: teksty + kontrolki + elementy listy + "＋".
+    function wireClonedSection(root, alias, prefix) {
+      wireEditable(root);
+      wireSectionControls(root, alias);
+      var wrappers = itemWrappersOf(prefix, root);
+      wrappers.forEach(function (w) {
+        var m = reItem.exec(w.getAttribute("data-edit") || "");
+        if (m) wireItem(w, alias, m[3]);
+      });
+      if (wrappers.length) addItemButton(wrappers[wrappers.length - 1], alias);
+    }
+
+    // Generyczny markup sekcji, gdy na stronie nie ma donora tego typu —
+    // "przyzwoicie" na tokenach strony; prawdziwy wygląd przy publikacji.
+    function buildGenericSection(m, prefix) {
+      var neighbor = lastVisibleSectionEl();
+      var sec = document.createElement("section");
+      if (neighbor) sec.className = neighbor.className;
+      sec.classList.remove("sitario-sec-host", "sitario-pos-rel");
+      sec.setAttribute("data-edit", prefix);
+      var inner = document.createElement("div");
+      inner.className = neighbor && neighbor.firstElementChild ? neighbor.firstElementChild.className : "";
+      if (!inner.className) inner.style.cssText = "max-width:72rem;margin:0 auto;padding:5rem 1.5rem;";
+      sec.appendChild(inner);
+      var texts = m.texts || {};
+
+      if (typeof texts.title === "string") {
+        var h2 = document.createElement("h2");
+        h2.setAttribute("data-edit", prefix + ".title");
+        h2.style.cssText = "font-weight:600;font-size:clamp(1.6rem,3vw,2.1rem);line-height:1.2;letter-spacing:-0.01em;margin:0;";
+        h2.textContent = texts.title;
+        inner.appendChild(h2);
+      }
+      if (typeof texts.intro === "string") {
+        var intro = document.createElement("p");
+        intro.setAttribute("data-edit", prefix + ".intro");
+        intro.style.cssText = "margin-top:1rem;font-size:1.05rem;max-width:42rem;color:var(--color-text-muted,inherit);";
+        intro.textContent = texts.intro;
+        inner.appendChild(intro);
+      }
+
+      var kind = m.listKey;
+      var n = m.listCount || 0;
+      if (kind && n) {
+        if (m.sectionType === "faq") {
+          var wrap = document.createElement("div");
+          wrap.style.cssText = "margin-top:2rem;display:flex;flex-direction:column;gap:12px;";
+          for (var i = 0; i < n; i++) {
+            var d = document.createElement("details");
+            d.setAttribute("data-edit", prefix + "." + kind + "." + i);
+            d.style.cssText = "border:1px solid var(--color-border,#ccc);border-radius:12px;background:var(--color-bg-elevated,transparent);padding:14px 20px;";
+            var s = document.createElement("summary");
+            s.style.cssText = "cursor:pointer;font-weight:500;";
+            var q = document.createElement("span");
+            q.setAttribute("data-edit", prefix + "." + kind + "." + i + ".q");
+            q.textContent = texts[kind + "." + i + ".q"] || "";
+            s.appendChild(q);
+            var a = document.createElement("p");
+            a.setAttribute("data-edit", prefix + "." + kind + "." + i + ".a");
+            a.style.cssText = "margin-top:10px;color:var(--color-text-muted,inherit);";
+            a.textContent = texts[kind + "." + i + ".a"] || "";
+            d.appendChild(s);
+            d.appendChild(a);
+            wrap.appendChild(d);
+          }
+          inner.appendChild(wrap);
+        } else if (m.sectionType === "stats") {
+          var row = document.createElement("div");
+          row.style.cssText = "margin-top:2rem;display:flex;flex-wrap:wrap;gap:2.5rem;";
+          for (var j = 0; j < n; j++) {
+            var cell = document.createElement("div");
+            cell.setAttribute("data-edit", prefix + "." + kind + "." + j);
+            var val = document.createElement("div");
+            val.setAttribute("data-edit", prefix + "." + kind + "." + j + ".value");
+            val.style.cssText = "font-weight:700;font-size:2.2rem;line-height:1.1;";
+            val.textContent = texts[kind + "." + j + ".value"] || "";
+            var lab = document.createElement("div");
+            lab.setAttribute("data-edit", prefix + "." + kind + "." + j + ".label");
+            lab.style.cssText = "margin-top:6px;font-size:.9rem;color:var(--color-text-muted,inherit);";
+            lab.textContent = texts[kind + "." + j + ".label"] || "";
+            cell.appendChild(val);
+            cell.appendChild(lab);
+            row.appendChild(cell);
+          }
+          inner.appendChild(row);
+        } else {
+          // features / process / testimonials → siatka prostych kart
+          var grid = document.createElement("div");
+          grid.style.cssText = "margin-top:2rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;";
+          for (var k = 0; k < n; k++) {
+            var card = document.createElement("div");
+            card.setAttribute("data-edit", prefix + "." + kind + "." + k);
+            card.style.cssText = "border:1px solid var(--color-border,#ccc);border-radius:12px;background:var(--color-bg-elevated,transparent);padding:20px;";
+            var first = true;
+            for (var key2 in texts) {
+              if (key2.indexOf(kind + "." + k + ".") !== 0) continue;
+              var field = key2.slice((kind + "." + k + ".").length);
+              if (field.indexOf(".") >= 0) continue; // tylko pola bezpośrednie
+              var elF = document.createElement(first ? "div" : "p");
+              elF.setAttribute("data-edit", prefix + "." + key2);
+              elF.style.cssText = first
+                ? "font-weight:600;font-size:1.05rem;"
+                : "margin-top:8px;font-size:.95rem;color:var(--color-text-muted,inherit);";
+              elF.textContent = texts[key2];
+              card.appendChild(elF);
+              first = false;
+            }
+            grid.appendChild(card);
+          }
+          inner.appendChild(grid);
+        }
+      }
+
+      if (m.sectionType === "prose" && typeof texts.html === "string") {
+        var pr = document.createElement("div");
+        pr.setAttribute("data-prose", "");
+        pr.setAttribute("data-edit", prefix + ".html");
+        pr.style.cssText = "margin-top:1.25rem;max-width:42rem;line-height:1.65;";
+        pr.innerHTML = texts.html;
+        inner.appendChild(pr);
+      }
+
+      // Generyk = przybliżenie — dyskretnie to mówimy.
+      var badge = document.createElement("div");
+      badge.className = "sitario-approx-badge";
+      badge.textContent = "Podgląd przybliżony — pełny wygląd po publikacji";
+      sec.appendChild(badge);
+      return sec;
+    }
+
+    // Logo w headerze (v30): pigułka "🖼 Zmień logo" → modal w panelu
+    // (podmiana grafiki + tekst logo). Heurystyka zamiast data-atrybutu:
+    // logo = pierwszy <a> w <header> (Logo.astro bywa przerobiony przez
+    // agenta, ale header/anchor-do-home to stała struktura szablonu).
+    function wireLogo() {
+      var header = document.querySelector("header");
+      var logo = header && header.querySelector("a");
+      if (!logo) return;
+      ensureRel(logo);
+      logo.classList.add("sitario-logo-host");
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "sitario-logo-pill";
+      btn.setAttribute("aria-label", "Zmień logo strony");
+      btn.textContent = "🖼 Zmień logo";
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        postUp({ type: "logo-edit" });
+      });
+      // Klik w sam anchor logo w podglądzie NIE nawiguję — otwiera modal.
+      logo.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        postUp({ type: "logo-edit" });
+      });
+      logo.appendChild(btn);
+    }
+
+    // ── init ─────────────────────────────────────────────────────────────
+    wireEditable(document.body);
+    wireLogo();
+
+    var sections = [];
+    document.querySelectorAll("[data-edit]").forEach(function (el) {
+      var m = reSection.exec(el.getAttribute("data-edit") || "");
+      if (m) sections.push({ el: el, page: m[1], key: m[2] });
+    });
+    // Jeden dokument = jedna strona; pageId z pierwszego korzenia sekcji.
+    if (sections.length) pageId = sections[0].page;
+
+    sections.forEach(function (s) { wireSectionControls(s.el, s.key); });
+    if (sections.length) {
+      // dolna strefa POD ostatnią sekcją buildu → wstaw na koniec
+      var lastN = -1, lastEl = null;
+      sections.forEach(function (s) {
+        var n = parseInt(s.key, 10);
+        if (!isNaN(n) && n > lastN) { lastN = n; lastEl = s.el; }
+      });
+      if (lastEl) addZone(lastEl, "bottom", lastN + 1);
+    }
+
+    // Elementy list: "✕" na hover + "＋ Dodaj element" za ostatnim (per sekcja).
+    // images (galeria) POMINIĘTE — panel ma własny flow uploadu/usuwania zdjęć.
+    var lastItems = {}; // secKey → ostatni wrapper w kolejności DOM
+    document.querySelectorAll("[data-edit]").forEach(function (el) {
+      var m = reItem.exec(el.getAttribute("data-edit") || "");
+      if (!m) return;
+      wireItem(el, m[1], m[3]);
+      lastItems[m[1]] = el;
+    });
+    Object.keys(lastItems).forEach(function (secKey) {
+      addItemButton(lastItems[secKey], secKey);
+    });
+
+    // ── komunikaty OD parenta ────────────────────────────────────────────
+    window.addEventListener("message", function (e) {
+      var m = e.data;
+      if (!m || !m.sitarioEdit) return;
+
+      // Podświetl + przewiń do wskazanej sekcji/elementu (panel: po kliknięciu
+      // pinu = pokazuje co zaznaczone; po edycji AI = pokazuje co się zmieniło).
+      if (m.type === "highlight") {
+        var target = m.path
+          ? document.querySelector('[data-edit="' + String(m.path).replace(/["\\]/g, "") + '"]')
+          : null;
+        if (target) {
+          try { target.scrollIntoView({ behavior: "smooth", block: "center" }); }
+          catch (er) { target.scrollIntoView(); }
+          target.classList.remove("sitario-flash");
+          void target.offsetWidth; // reflow → animacja od nowa
+          target.classList.add("sitario-flash");
+          setTimeout(function () { target.classList.remove("sitario-flash"); }, 2400);
+        }
+        return;
+      }
+
+      // Podmiana ikony na żywo (v36): panel po wyborze z pickera odsyła
+      // geometrię — natychmiastowy feedback bez przebudowy.
+      if (m.type === "icon-swap") {
+        var icEl = document.querySelector('[data-icon-edit="' + String(m.path).replace(/["\\]/g, "") + '"]');
+        var svg = icEl && icEl.querySelector("svg");
+        if (svg && typeof m.body === "string") svg.innerHTML = m.body;
+        return;
+      }
+
+      if (m.type === "hide-section") {
+        if (!reKeyOk.test(String(m.index))) return;
+        var sec = findEdit(m.page + "#sections." + m.index);
+        if (sec) sec.style.display = "none"; // strefy/pigułki to dzieci — znikają razem
+        return;
+      }
+
+      if (m.type === "hide-item") {
+        if (!reKeyOk.test(String(m.sectionIndex)) || !reKeyOk.test(String(m.itemIndex))) return;
+        var it =
+          findEdit(m.page + "#sections." + m.sectionIndex + ".items." + m.itemIndex) ||
+          findEdit(m.page + "#sections." + m.sectionIndex + ".steps." + m.itemIndex);
+        if (it) it.style.display = "none";
+        return;
+      }
+
+      if (m.type === "insert-item-dom") {
+        // Klon OSTATNIEGO widocznego elementu listy sekcji → alias + prefill.
+        var secKey = String(m.sectionBuild);
+        var alias = String(m.alias);
+        if (!reKeyOk.test(secKey) || !/^n\d+$/.test(alias)) return;
+        var secPrefix = m.page + "#sections." + secKey;
+        var wrappers = itemWrappersOf(secPrefix);
+        if (!wrappers.length) return;
+        var donor = null;
+        for (var i = wrappers.length - 1; i >= 0; i--) {
+          if (wrappers[i].style.display !== "none") { donor = wrappers[i]; break; }
+        }
+        if (!donor) return;
+        var lastW = wrappers[wrappers.length - 1];
+        var clone = donor.cloneNode(true);
+        cleanClone(clone);
+        var oldP = donor.getAttribute("data-edit");
+        var newP = oldP.replace(new RegExp("\\.(items|steps)\\." + KEY + "$"), function (_, kind) {
+          return "." + kind + "." + alias;
+        });
+        rewritePrefix(clone, oldP, newP);
+        applyTexts(clone, newP, m.texts);
+        if (m.donorTexts && m.texts) {
+          Object.keys(m.texts).forEach(function (rel) {
+            forceEditLeaf(clone, newP + "." + rel, m.texts[rel], m.donorTexts[rel]);
+          });
+        }
+        // v37: numer kroku w sekcji "proces" — klon kopiował numer donora
+        // ("05" obok "05"); prawdziwy render liczy z indeksu przy buildzie,
+        // tu podbijamy w DOM (liczba WIDOCZNYCH kroków + 1).
+        var stepNo = clone.querySelector("[data-step-no]");
+        if (stepNo) {
+          var visible = 0;
+          for (var vi = 0; vi < wrappers.length; vi++) {
+            if (wrappers[vi].style.display !== "none") visible++;
+          }
+          stepNo.textContent = (visible + 1 < 10 ? "0" : "") + (visible + 1);
+        }
+        lastW.insertAdjacentElement("afterend", clone); // przed kafelkiem "＋"
+        wireEditable(clone);
+        wireItem(clone, secKey, alias);
+        return;
+      }
+
+      if (m.type === "insert-section-dom") {
+        var alias2 = String(m.alias);
+        if (!/^n\d+$/.test(alias2)) return;
+        var prefix = m.page + "#sections." + alias2;
+        var beforeEl = m.beforeBuild != null && reKeyOk.test(String(m.beforeBuild))
+          ? findEdit(m.page + "#sections." + m.beforeBuild)
+          : null;
+        var root = null;
+        var donorEl = m.donorBuild != null && reKeyOk.test(String(m.donorBuild))
+          ? findEdit(m.page + "#sections." + m.donorBuild)
+          : null;
+
+        if (donorEl && donorEl.style.display !== "none") {
+          root = donorEl.cloneNode(true);
+          cleanClone(root);
+          rewritePrefix(root, donorEl.getAttribute("data-edit"), prefix);
+          // Lista: wywal ukryte (usunięte) elementy, dotnij/zduplikuj do
+          // listCount, przenumeruj klucze elementów na 0..count-1 (jak stan).
+          var ws = [];
+          if (m.listKey) {
+            ws = itemWrappersOf(prefix, root); // root jeszcze ODŁĄCZONY
+            ws = ws.filter(function (w) {
+              if (w.style.display === "none") { w.remove(); return false; }
+              return true;
+            });
+            var want = m.listCount || 0;
+            while (ws.length > want && ws.length > 0) ws.pop().remove();
+            while (ws.length < want && ws.length > 0) {
+              var srcW = ws[ws.length - 1];
+              var dup = srcW.cloneNode(true);
+              srcW.insertAdjacentElement("afterend", dup);
+              ws.push(dup);
+            }
+            ws.forEach(function (w, idx) {
+              var a = w.getAttribute("data-edit") || "";
+              var mm = new RegExp("\\.(items|steps)\\." + KEY + "$").exec(a);
+              if (mm) rewritePrefix(w, a, prefix + "." + mm[1] + "." + idx);
+            });
+          }
+          applyTexts(root, prefix, m.texts);
+          // Fidelity-fallback dla komponentów bez liści data-edit w elementach
+          // (features/stats): dopasuj po tekstach donora ze stanu.
+          if (m.donorTexts && m.texts) {
+            Object.keys(m.texts).forEach(function (rel) {
+              if (m.listKey && rel.indexOf(m.listKey + ".") === 0) return; // itemy niżej, per wrapper
+              forceEditLeaf(root, prefix + "." + rel, m.texts[rel], m.donorTexts[rel]);
+            });
+            if (m.listKey) {
+              ws.forEach(function (w, idx) {
+                var donorIdx = Math.min(idx, Math.max(0, (m.donorListCount || 1) - 1));
+                var pre = m.listKey + "." + idx + ".";
+                Object.keys(m.texts).forEach(function (rel) {
+                  if (rel.indexOf(pre) !== 0) return;
+                  var f = rel.slice(pre.length);
+                  forceEditLeaf(w, prefix + "." + rel, m.texts[rel], m.donorTexts[m.listKey + "." + donorIdx + "." + f]);
+                });
+              });
+            }
+          }
+        } else {
+          root = buildGenericSection(m, prefix);
+        }
+
+        if (beforeEl) beforeEl.insertAdjacentElement("beforebegin", root);
+        else {
+          var anchor = lastVisibleSectionEl();
+          if (anchor) anchor.insertAdjacentElement("afterend", root);
+          else document.body.appendChild(root);
+        }
+        wireClonedSection(root, alias2, prefix);
+        // Dodana sekcja: PŁYNNIE przewiń i błyśnij (user od razu widzi, co
+        // dodał — feedback Karola 2026-07-15: „ma pojawić się OD RAZU i user
+        // ma być do niej płynnie przeniesiony").
+        if (m.scrollTo) {
+          try { root.scrollIntoView({ behavior: "smooth", block: "center" }); }
+          catch (er) { try { root.scrollIntoView(); } catch (e2) {} }
+          root.classList.remove("sitario-flash");
+          void root.offsetWidth; // reflow → animacja od nowa
+          root.classList.add("sitario-flash");
+          setTimeout(function () { root.classList.remove("sitario-flash"); }, 2400);
+        }
+        return;
+      }
+    });
+
+    postUp({ type: "ready", paths: editable });
+  })();
+</script>

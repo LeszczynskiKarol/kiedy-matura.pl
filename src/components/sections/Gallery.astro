@@ -1,0 +1,276 @@
+---
+// Galeria zdjęć — optymalizacja przez astro:assets (sharp): build generuje
+// WebP w kilku szerokościach, lazy loading, explicit dimensions (zero CLS).
+// Oryginały: src/assets/gallery/ (jpg/png — dowolne, build konwertuje).
+import { Image, getImage } from "astro:assets";
+import IconBadge from "../IconBadge.astro";
+import { editAttrs } from "../../lib/edit";
+import { sectionBg } from "../../lib/sections";
+import type { GalleryData } from "../../content.config";
+
+interface Props {
+  data: GalleryData;
+  editPath: string;
+}
+const { data, editPath } = Astro.props;
+
+// Paginacja (#34, 2026-07-11): przy dużych galeriach pokazujemy pierwsze
+// PAGE_SIZE zdjęć, reszta rozwija się przyciskiem (progressive reveal —
+// ukryte <figure hidden> nie ładują obrazków dzięki loading="lazy",
+// a wszystkie są w DOM, więc SEO/edytor widzą całość).
+const PAGE_SIZE = 12;
+const paginated = data.images.length > PAGE_SIZE;
+const galleryId = `gallery-${(data.id || editPath).replace(/[^a-zA-Z0-9-]/g, "-")}`;
+
+// Mapowanie nazwy pliku z danych na moduł obrazka (astro:assets wymaga importu).
+const files = import.meta.glob<{ default: ImageMetadata }>(
+  "../../assets/gallery/*.{jpg,jpeg,png,webp,avif}",
+  { eager: true }
+);
+function resolveImage(name: string): ImageMetadata {
+  const hit = Object.entries(files).find(([p]) => p.endsWith(`/${name}`));
+  if (!hit) {
+    throw new Error(
+      `Galeria: brak pliku src/assets/gallery/${name} (sekcja "${data.title}")`
+    );
+  }
+  return hit[1].default;
+}
+
+// Lightbox (v27): duży wariant per zdjęcie (miniatury mają max 960 px —
+// w modalu na desktopie byłyby miękkie). data-full na <figure>, skrypt
+// lightboxa czyta go z fallbackiem na currentSrc (strony po migracji).
+const fullSrcs = await Promise.all(
+  data.images.map((item) =>
+    getImage({ src: resolveImage(item.image), width: 1600, format: "webp", quality: 82 }).then((r) => r.src)
+  )
+);
+---
+
+<section
+  id={data.id}
+  class:list={["border-b border-[var(--color-border)]", sectionBg(data.background)]}
+  {...editAttrs(editPath)}
+>
+  <div class="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+    <div class="max-w-2xl">
+      {data.badge && <IconBadge icon={data.badge.icon} label={data.badge.label} tone={data.badge.tone} editPath={`${editPath}.badge.label`} />}
+      <h2
+        class="mt-4 font-serif text-[length:var(--text-fs-h2)] font-medium leading-tight tracking-tight"
+        {...editAttrs(`${editPath}.title`)}
+      >
+        {data.title}
+      </h2>
+      {data.intro && (
+        <p class="mt-4 text-lg text-[var(--color-text-muted)]" {...editAttrs(`${editPath}.intro`)}>
+          {data.intro}
+        </p>
+      )}
+    </div>
+
+    <div id={galleryId} class="mt-12 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+      {data.images.map((item, i) => (
+        <figure
+          class="group overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)]"
+          hidden={paginated && i >= PAGE_SIZE ? true : undefined}
+          data-gallery-item
+          data-full={fullSrcs[i]}
+          {...editAttrs(`${editPath}.images.${i}`)}
+        >
+          <Image
+            src={resolveImage(item.image)}
+            alt={item.alt}
+            widths={[400, 640, 960]}
+            sizes="(min-width: 1024px) 33vw, 50vw"
+            format="webp"
+            quality={78}
+            loading="lazy"
+            class="aspect-[4/3] h-auto w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+          />
+          {item.caption && (
+            <figcaption class="px-4 py-3 text-sm text-[var(--color-text-muted)]">
+              {item.caption}
+            </figcaption>
+          )}
+        </figure>
+      ))}
+    </div>
+
+    {paginated && (
+      <div class="mt-8 text-center">
+        <button
+          type="button"
+          class="needs-js inline-flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-6 py-3 text-sm font-semibold text-[var(--color-text)] transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
+          data-gallery-more={galleryId}
+          data-step={PAGE_SIZE}
+        >
+          Pokaż więcej zdjęć
+          <span class="text-[var(--color-text-faint)]" data-gallery-count>({data.images.length - PAGE_SIZE})</span>
+        </button>
+      </div>
+    )}
+  </div>
+</section>
+
+{paginated && (
+  <script is:inline>
+    // Progressive reveal galerii — RAW JS (nie owijać w {``}). Odsłania
+    // kolejną partię ukrytych <figure>; po wyczerpaniu chowa przycisk.
+    (function () {
+      document.querySelectorAll("[data-gallery-more]").forEach(function (btn) {
+        if (btn.dataset.bound) return;
+        btn.dataset.bound = "1";
+        btn.addEventListener("click", function () {
+          var grid = document.getElementById(btn.getAttribute("data-gallery-more"));
+          if (!grid) return;
+          var hidden = grid.querySelectorAll("[data-gallery-item][hidden]");
+          var step = parseInt(btn.getAttribute("data-step"), 10) || 12;
+          for (var i = 0; i < Math.min(step, hidden.length); i++) hidden[i].removeAttribute("hidden");
+          var left = hidden.length - Math.min(step, hidden.length);
+          var count = btn.querySelector("[data-gallery-count]");
+          if (count) count.textContent = "(" + left + ")";
+          if (left <= 0) btn.parentElement.remove();
+        });
+      });
+    })();
+  </script>
+)}
+
+<script is:inline>
+  // Lightbox galerii (v27) — RAW JS (nie owijać w {``}), zero zależności,
+  // style inline (dynamiczny DOM nie może polegać na klasach Tailwinda —
+  // build ich nie zeskanuje). Singleton na stronę (kilka sekcji gallery =
+  // jeden lightbox); WYŁĄCZONY w iframe (podgląd edytora — kliknięcia
+  // należą do EditOverlay; osadzenie na landingu — bez modala).
+  // Nawigacja: klik / Enter / Spacja otwiera, ← → przełącza, Esc i klik
+  // tła zamyka. data-full (duży wariant 1600px) z fallbackiem na currentSrc
+  // miniatury (strony po migracji 027 bez data-full).
+  (function () {
+    if (window.self !== window.top) return;
+    if (window.__sitarioLightbox) return;
+    window.__sitarioLightbox = true;
+
+    function figsAll() {
+      return Array.prototype.slice.call(document.querySelectorAll("[data-gallery-item]"));
+    }
+    function srcOf(fig) {
+      var img = fig.querySelector("img");
+      return fig.getAttribute("data-full") || (img && (img.currentSrc || img.src)) || "";
+    }
+
+    // Dostępność miniatur: fokusowalne, rola przycisku, kursor lupy.
+    function wire() {
+      figsAll().forEach(function (fig) {
+        if (fig.dataset.lbWired) return;
+        fig.dataset.lbWired = "1";
+        fig.style.cursor = "zoom-in";
+        fig.setAttribute("tabindex", "0");
+        fig.setAttribute("role", "button");
+        var img = fig.querySelector("img");
+        fig.setAttribute("aria-label", "Powiększ: " + ((img && img.alt) || "zdjęcie"));
+      });
+    }
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire);
+    else wire();
+
+    var box = null, imgEl = null, capEl = null, prevBtn = null, nextBtn = null;
+    var list = [], idx = 0, lastFocus = null;
+
+    function mkBtn(label, glyph, css) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("aria-label", label);
+      b.innerHTML = glyph;
+      b.style.cssText =
+        "position:absolute;display:flex;align-items:center;justify-content:center;width:44px;height:44px;" +
+        "border:0;border-radius:9999px;background:rgba(255,255,255,.12);color:#fff;font-size:20px;" +
+        "cursor:pointer;transition:background .15s;" + css;
+      b.onmouseenter = function () { b.style.background = "rgba(255,255,255,.25)"; };
+      b.onmouseleave = function () { b.style.background = "rgba(255,255,255,.12)"; };
+      return b;
+    }
+
+    function build() {
+      box = document.createElement("div");
+      box.setAttribute("role", "dialog");
+      box.setAttribute("aria-modal", "true");
+      box.setAttribute("aria-label", "Podgląd zdjęcia");
+      box.style.cssText =
+        "position:fixed;inset:0;z-index:2147483000;display:flex;flex-direction:column;align-items:center;" +
+        "justify-content:center;background:rgba(9,11,15,.93);opacity:0;transition:opacity .18s;padding:24px;box-sizing:border-box";
+      imgEl = document.createElement("img");
+      imgEl.style.cssText = "max-width:min(1600px,94vw);max-height:84vh;object-fit:contain;border-radius:10px;box-shadow:0 24px 80px rgba(0,0,0,.5)";
+      capEl = document.createElement("p");
+      capEl.style.cssText = "margin:14px 0 0;max-width:80ch;text-align:center;color:rgba(255,255,255,.75);font-size:14px;line-height:1.5";
+      var close = mkBtn("Zamknij podgląd", "✕", "top:16px;right:16px");
+      close.addEventListener("click", hide);
+      prevBtn = mkBtn("Poprzednie zdjęcie", "←", "left:12px;top:50%;transform:translateY(-50%)");
+      nextBtn = mkBtn("Następne zdjęcie", "→", "right:12px;top:50%;transform:translateY(-50%)");
+      prevBtn.addEventListener("click", function (e) { e.stopPropagation(); step(-1); });
+      nextBtn.addEventListener("click", function (e) { e.stopPropagation(); step(1); });
+      box.appendChild(imgEl);
+      box.appendChild(capEl);
+      box.appendChild(close);
+      box.appendChild(prevBtn);
+      box.appendChild(nextBtn);
+      // Klik w tło (nie w zdjęcie/przyciski) zamyka.
+      box.addEventListener("click", function (e) { if (e.target === box) hide(); });
+      document.body.appendChild(box);
+    }
+
+    function render() {
+      var it = list[idx];
+      if (!it) return;
+      imgEl.src = it.src;
+      imgEl.alt = it.alt;
+      capEl.textContent = it.cap || "";
+      capEl.style.display = it.cap ? "" : "none";
+      var many = list.length > 1;
+      prevBtn.style.display = many ? "" : "none";
+      nextBtn.style.display = many ? "" : "none";
+    }
+    function step(d) { idx = (idx + d + list.length) % list.length; render(); }
+
+    function show(startFig) {
+      var figs = figsAll();
+      list = figs.map(function (f) {
+        var img = f.querySelector("img");
+        var cap = f.querySelector("figcaption");
+        return { src: srcOf(f), alt: (img && img.alt) || "", cap: cap ? cap.textContent.trim() : "" };
+      });
+      idx = Math.max(0, figs.indexOf(startFig));
+      if (!box) build();
+      lastFocus = document.activeElement;
+      render();
+      box.style.display = "flex";
+      document.documentElement.style.overflow = "hidden";
+      requestAnimationFrame(function () { box.style.opacity = "1"; });
+      document.addEventListener("keydown", onKey);
+      box.querySelector("button").focus();
+    }
+    function hide() {
+      if (!box) return;
+      box.style.opacity = "0";
+      document.documentElement.style.overflow = "";
+      document.removeEventListener("keydown", onKey);
+      setTimeout(function () { if (box) box.style.display = "none"; }, 180);
+      if (lastFocus && lastFocus.focus) lastFocus.focus();
+    }
+    function onKey(e) {
+      if (e.key === "Escape") hide();
+      else if (e.key === "ArrowLeft") step(-1);
+      else if (e.key === "ArrowRight") step(1);
+    }
+
+    // Delegacja: działa też dla zdjęć odsłoniętych później ("Pokaż więcej").
+    document.addEventListener("click", function (e) {
+      var fig = e.target && e.target.closest ? e.target.closest("[data-gallery-item]") : null;
+      if (fig) { e.preventDefault(); show(fig); }
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      var fig = e.target && e.target.closest ? e.target.closest("[data-gallery-item]") : null;
+      if (fig) { e.preventDefault(); show(fig); }
+    });
+  })();
+</script>

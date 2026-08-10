@@ -1,0 +1,84 @@
+# Brief — DOMAIN_PLACEHOLDER
+
+**Mode**: INTERACTIVE | AUTONOMOUS (skreśl niewłaściwe)
+**Data**: YYYY-MM-DD
+**Status**: draft | signed-off
+
+---
+
+## Cel biznesowy
+
+Jedno zdanie. Co ta strona ma osiągnąć? (sprzedaż, leady, wizytówka, portfolio, edukacja).
+
+## Audytorium
+
+- **Typ**: B2B | B2C | mieszane
+- **Region**: lokalny (miasto) | krajowy | międzynarodowy
+- **Charakterystyka**: kim są (wiek, sytuacja, problem, motywacja)
+- **Język(i)**: PL | PL+EN | inne
+
+## USP (Unique Selling Point)
+
+Jedno zdanie. Co odróżnia od konkurencji? Nie ogólnik ("indywidualne podejście"), tylko konkret.
+
+## Sekcje strony
+
+W kolejności od góry:
+
+1. Hero — *headline + CTA*
+2. ...
+3. Kontakt
+
+## Branding
+
+- **Logo**: dostarczone | do zaprojektowania | brak
+- **Preset designu**: editorial | craft | tech / SaaS | corporate | premium | local services (patrz `playbooks/05-design-system.md`)
+- **Paleta**: opisz akcent + neutralne LUB napisz "auto-pick z presetu"
+- **Typografia**: domyślna z presetu LUB konkret (Inter + DM Serif, Geist, etc.)
+- **Ton**: formalny | partnerski | luźny | ekspercki (jedno + jedno zdanie uzasadnienia)
+- **Referencje wizualne**: linki do 1-3 stron, które robią to dobrze
+
+## Formularz kontaktowy
+
+- **Wymagany**: tak | nie
+- **Pola**: imię, e-mail, telefon, treść (+ co jeszcze konkretnego dla branży)
+- **Załączniki**: tak | nie
+- **Skrzynka docelowa**: `kontakt@DOMAIN_PLACEHOLDER` (zakładana na Aftermarket, forwarding na <prywatny adres Karola>)
+- **MX provider**: aftermarket (default) | cyber-folks | none
+
+## Treść
+
+- **Źródło**: Karol dostarcza | piszę od zera na podstawie briefu
+- **Materiały**: zdjęcia, opisy produktów, dokumenty PDF — co Karol ma do dyspozycji
+- **Język copy**: PL (lub PL+EN)
+
+## SEO
+
+- **Główne frazy** (1-5): "fronty kuchenne Toruń", "prawnik rodzinny Bydgoszcz", etc.
+- **Konkurencja** (3 linki): kto rankuje na te frazy
+
+## Feature flags (siteConfig)
+
+Decyzje per-projekt. Domyślne wartości w nawiasach.
+
+- [ ] **ga4** (`null`) → ustaw GA4 ID jeśli Karol ma / chce mieć analytics
+- [ ] **contactForm** (`false`) → `true` jeśli sekcja "Formularz kontaktowy" mówi "tak"
+- [ ] **hasShop** (`false`) → `true` JEŚLI strona sprzedaje produkty/usługi online (zbiera płatności, przyjmuje zamówienia z checkoutem). Trigeruje renderowanie `/regulamin`
+- [ ] **hasBlog** (`false`) → `true` **TYLKO jeśli Karol explicite napisał że chce blog**. Domyślnie NIE — strona idzie bez bloga
+
+## Co claude założył (bo nie zapytał)
+
+*(W trybie autonomous — wszystkie decyzje, które Claude podjął sam. To jest twoja jedyna szansa na pokazanie Karolowi z czym się nie zgadza.)*
+
+- Decyzja 1: <co> — <bo>
+- Decyzja 2: <co> — <bo>
+
+## Co świadomie pominięto
+
+- *(Sekcje/funkcje które celowo nie wchodzą do MVP)*
+
+## Materiały do uzupełnienia przez Karola po launch
+
+- [ ] *(np. 3 prawdziwe opinie klientów do sekcji /opinie)*
+- [ ] *(np. NIP, adres do polityki prywatności + regulaminu)*
+- [ ] *(np. zdjęcia z realizacji 2026)*

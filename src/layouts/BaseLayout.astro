@@ -1,0 +1,207 @@
+---
+import "../styles/global.css";
+import { siteConfig } from "../config/site";
+import Analytics from "../components/Analytics.astro";
+import CookieConsent from "../components/CookieConsent.astro";
+import FooterBaseline from "../components/FooterBaseline.astro";
+import EditOverlay from "../components/EditOverlay.astro";
+import { EDIT_PREVIEW } from "../lib/edit";
+
+interface Props {
+  title: string;
+  description: string;
+  ogImage?: string;
+  canonicalUrl?: string;
+  noindex?: boolean;
+  preloadImage?: string;
+  preloadImageType?: string;
+  preloadImageSrcset?: string;
+  preloadImageSizes?: string;
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[];
+}
+
+const {
+  title,
+  description,
+  ogImage = "/og-image.jpg",
+  canonicalUrl = Astro.url.href,
+  noindex = false,
+  preloadImage,
+  preloadImageType = "image/webp",
+  preloadImageSrcset,
+  preloadImageSizes,
+  jsonLd,
+} = Astro.props;
+
+const siteName = siteConfig.name;
+const fullTitle = title === siteName ? title : `${title} | ${siteName}`;
+const absoluteOgImage = ogImage.startsWith("http")
+  ? ogImage
+  : new URL(ogImage, Astro.site).href;
+
+// FONTY — WYŁĄCZNIE self-host (public/fonts/ + @font-face w global.css).
+// ZAKAZ Google Fonts w runtime: transfer IP użytkownika do Google narusza
+// RODO (LG München I, 3 O 17493/20, 2022) + zewnętrzny request kosztuje
+// ~0,5-1 s FCP na mobile (audyt SEO 2026-07-10: 186 KB z fonts.gstatic
+// = FCP 3,3 s). Inne kroje per-projekt: pobierz woff2, zsubsetuj PL+latin,
+// wrzuć do public/fonts/ i dodaj @font-face — NIGDY <link> do
+// fonts.googleapis.com / fonts.gstatic.com.
+---
+
+<!doctype html>
+<html lang={siteConfig.lang} class="no-js">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="generator" content={Astro.generator} />
+
+    <link
+      rel="preload"
+      href="/fonts/inter-var-pl.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+
+    {preloadImage && (
+      <link
+        rel="preload"
+        as="image"
+        href={preloadImage}
+        type={preloadImageType}
+        fetchpriority="high"
+        imagesrcset={preloadImageSrcset}
+        imagesizes={preloadImageSizes}
+      />
+    )}
+
+    <title>{fullTitle}</title>
+    <meta name="title" content={fullTitle} />
+    <meta name="description" content={description} />
+    {noindex || EDIT_PREVIEW ? (
+      <meta name="robots" content="noindex, nofollow" />
+    ) : (
+      <meta name="robots" content="index, follow" />
+    )}
+    <link rel="canonical" href={canonicalUrl} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={absoluteOgImage} />
+    <meta property="og:locale" content={siteConfig.locale} />
+    <meta property="og:site_name" content={siteName} />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content={canonicalUrl} />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={absoluteOgImage} />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
+    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#fafaf7" media="(prefers-color-scheme: light)" />
+
+    <!-- Theme init — inline to prevent FOUC -->
+    <script is:inline>
+      (function () {
+        const stored = localStorage.getItem("theme");
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        if (stored === "dark" || (!stored && prefersDark)) {
+          document.documentElement.classList.add("dark");
+        }
+        document.documentElement.classList.remove("no-js");
+      })();
+    </script>
+
+    <!-- GA4 + Consent Mode v2 (renders only if siteConfig.features.ga4 is set) -->
+    <Analytics />
+
+    <script
+      type="application/ld+json"
+      set:html={JSON.stringify(
+        jsonLd
+          ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd])
+          : /* Domyślny JSON-LD (fix 2026-07-11: strony bez jawnego jsonLd
+               nie miały ŻADNYCH danych strukturalnych — a to twardy wymóg;
+               sygnał dla wyszukiwarek i asystentów AI). Organization +
+               WebSite z siteConfig — zawsze prawdziwe, zero zmyślania. */
+            [
+              {
+                "@context": "https://schema.org",
+                "@type": "Organization",
+                name: siteConfig.name,
+                url: siteConfig.url,
+                ...(siteConfig.legal?.adminEmail ? { email: siteConfig.legal.adminEmail } : {}),
+              },
+              {
+                "@context": "https://schema.org",
+                "@type": "WebSite",
+                name: siteConfig.name,
+                url: siteConfig.url,
+              },
+            ]
+      )}
+    />
+  </head>
+
+  <body class="min-h-screen overflow-x-hidden">
+    <a href="#main" class="skip-link">Przejdź do treści</a>
+
+    <slot />
+
+    <script is:inline>
+      document.addEventListener("DOMContentLoaded", () => {
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                entry.target.classList.add("is-visible");
+                observer.unobserve(entry.target);
+              }
+            });
+          },
+          { threshold: 0.1, rootMargin: "0px 0px -50px 0px" }
+        );
+        document
+          .querySelectorAll(".animate-on-scroll")
+          .forEach((el) => observer.observe(el));
+      });
+    </script>
+
+    <script is:inline>
+      // Atrybucja Google Ads (#32): gclid z reklamy wędruje w URL między
+      // podstronami — dekorujemy linki wewnętrzne W MOMENCIE kliknięcia.
+      // Zero cookies/storage (ePrivacy-clean); crawler nie klika, więc SEO
+      // nietknięte; canonical i tak wskazuje czysty URL. Raw JS — NIE owijać
+      // w JSX-expression (anty-pattern is:inline).
+      (function () {
+        var g;
+        try {
+          g = new URLSearchParams(location.search).get("gclid");
+        } catch (e) { return; }
+        if (!g || !/^[\w-]{10,200}$/.test(g)) return;
+        document.addEventListener("click", function (e) {
+          var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+          if (!a) return;
+          var href = a.getAttribute("href") || "";
+          if (href.indexOf("#") === 0 || /^(mailto:|tel:|javascript:)/i.test(href)) return;
+          try {
+            var url = new URL(a.href, location.href);
+            if (url.origin !== location.origin || url.searchParams.has("gclid")) return;
+            url.searchParams.set("gclid", g);
+            a.href = url.href;
+          } catch (err) {}
+        }, true);
+      })();
+    </script>
+
+    <FooterBaseline />
+    <CookieConsent />
+    {EDIT_PREVIEW && <EditOverlay />}
+  </body>
+</html>
