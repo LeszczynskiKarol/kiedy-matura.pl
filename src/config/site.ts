@@ -24,8 +24,9 @@ export const siteConfig = {
   },
 
   features: {
-    // Uzupełniane automatycznie w kroku 5b (playbook 11 — GA4 auto-provisioning).
-    ga4: null as string | null,
+    // GA4 property 549327122 (konto „Root dla zaplecz z astro generator").
+    // Consent Mode v2 włącza się automatycznie razem z tym ID.
+    ga4: "G-R2PW6W8N17" as string | null,
     contactForm: false,
     contactFormAttachments: false,
     hasShop: false,
