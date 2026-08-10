@@ -63,6 +63,17 @@ const absoluteOgImage = ogImage.startsWith("http")
       crossorigin
     />
 
+    {/* Bricolage renderuje licznik, czyli element LCP. Bez preloadu font
+        przegrywa wyścig o pasmo ze skryptem GA4 i LCP rośnie z 2,9 do 4,5 s
+        (zmierzone PSI mobile, 3 przebiegi). */}
+    <link
+      rel="preload"
+      href="/fonts/bricolage-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+
     {preloadImage && (
       <link
         rel="preload"
