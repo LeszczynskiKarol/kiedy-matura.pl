@@ -67,7 +67,24 @@ const gaId = siteConfig.features.ga4;
         } catch (e) {}
       </script>
 
-      <script async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`} />
+      {/* gtag.js dociągamy dopiero po `load`, a nie przez `async` w <head>.
+          Mimo `async` skrypt konkurował o pasmo z fontem elementu LCP i na
+          throttlingu mobilnym podnosił LCP z 2,9 do 4,5 s (PSI, 3 przebiegi).
+          Consent Mode ustawia się wcześniej inline, więc odroczenie niczego
+          nie psuje: gtag i tak nie wysyła zdarzeń przed zgodą, a kolejka
+          `dataLayer` zbiera wywołania sprzed załadowania biblioteki. */}
+      <script is:inline define:vars={{ gaId }}>
+        (function () {
+          function load() {
+            var s = document.createElement('script');
+            s.async = true;
+            s.src = 'https://www.googletagmanager.com/gtag/js?id=' + gaId;
+            document.head.appendChild(s);
+          }
+          if (document.readyState === 'complete') load();
+          else window.addEventListener('load', load, { once: true });
+        })();
+      </script>
 
       <script is:inline define:vars={{ gaId }}>
         gtag('js', new Date());
