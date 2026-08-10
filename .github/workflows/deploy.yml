@@ -1,0 +1,63 @@
+name: Build & Deploy kiedy-matura.pl
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+
+concurrency:
+  group: deploy-kiedy-matura
+  cancel-in-progress: true
+
+# OIDC zamiast długożyjących kluczy — rola gh-deploy-kiedy-matura.pl ufa
+# wyłącznie temu repo na gałęzi main (patrz templates/aws/setup-deploy-role.sh).
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Assety mają hash w nazwie → cache na rok. HTML/XML/TXT krótko, bo
+      # licznik i „za X dni" starzeją się razem z buildem.
+      - name: Sync do S3
+        run: |
+          aws s3 sync dist/ "s3://${{ secrets.S3_BUCKET }}/" --delete --size-only \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "*.html" --exclude "robots.txt" --exclude "sitemap*.xml"
+          aws s3 sync dist/ "s3://${{ secrets.S3_BUCKET }}/" --delete \
+            --cache-control "public, max-age=300, must-revalidate" \
+            --exclude "*" --include "*.html" --include "robots.txt" --include "sitemap*.xml"
+
+      - name: Inwalidacja CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ secrets.CLOUDFRONT_DIST_ID }}" \
+            --paths "/*" --query "Invalidation.Status" --output text
+
+      - name: Weryfikacja
+        run: |
+          set -e
+          code=$(curl -s -o /dev/null -w "%{http_code}" https://www.kiedy-matura.pl/)
+          echo "www: $code"
+          [ "$code" = "200" ] || exit 1
+          redir=$(curl -s -o /dev/null -w "%{http_code}" https://kiedy-matura.pl/)
+          echo "naked: $redir"
