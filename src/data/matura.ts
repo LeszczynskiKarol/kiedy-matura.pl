@@ -2,25 +2,22 @@
    kiedy-matura.pl — DANE
    ---------------------------------------------------------------------
    ŹRÓDŁO TERMINÓW:
-   CKE publikuje oficjalny harmonogram matury 2027 do 20 sierpnia 2026.
-   Do tego czasu poniższe daty są PRZEWIDYWANE — odwzorowane 1:1 na
-   strukturze realnego harmonogramu 2026 (start w pierwszy dzień roboczy
-   po 3 maja, ten sam układ dni tygodnia, te same godziny).
-   Po komunikacie CKE: podmień OFFICIAL na true i popraw daty w EXAMS.
+   Komunikat dyrektora Centralnej Komisji Egzaminacyjnej z 20 sierpnia
+   2026 r. w sprawie harmonogramu przeprowadzania egzaminu ósmoklasisty
+   oraz egzaminu maturalnego w 2027 roku
+   (20260820_E8_EM_Komunikat_o_harmonogramie_2027_fin.pdf, cke.gov.pl).
+   Daty i godziny poniżej są przepisane 1:1 z tego dokumentu.
    ===================================================================== */
 
-export const OFFICIAL = false; // ← ustaw true, gdy CKE ogłosi harmonogram 2027
+export const OFFICIAL = true; // harmonogram CKE ogłoszony 20 sierpnia 2026
 
-/* --- Egzaminy pisemne, termin główny (maj 2027) ---------------------- */
+/* --- Egzaminy pisemne, termin główny (4–24 maja 2027) ----------------- */
 export const EXAMS = [
   { d: '2027-05-04', t: '09:00', s: 'Język polski',            lvl: 'PP', core: true,
     note: 'Otwarcie sezonu. Wszyscy, cała Polska, ten sam arkusz, ta sama cisza.' },
 
   { d: '2027-05-05', t: '09:00', s: 'Matematyka',              lvl: 'PP', core: true,
     note: 'Dzień, w którym karta wzorów staje się najbliższą Ci osobą.' },
-  { d: '2027-05-05', t: '14:00', s: 'Język łaciński i kultura antyczna', lvl: 'PR' },
-  { d: '2027-05-05', t: '14:00', s: 'Język kaszubski',         lvl: 'PR' },
-  { d: '2027-05-05', t: '14:00', s: 'Język łemkowski',         lvl: 'PR' },
 
   { d: '2027-05-06', t: '09:00', s: 'Język angielski',         lvl: 'PP', core: true,
     note: 'Najłatwiejszy obowiązkowy egzamin, o którym i tak będziesz się stresować.' },
@@ -30,57 +27,66 @@ export const EXAMS = [
   { d: '2027-05-06', t: '09:00', s: 'Język rosyjski',          lvl: 'PP' },
   { d: '2027-05-06', t: '09:00', s: 'Język włoski',            lvl: 'PP' },
   { d: '2027-05-06', t: '09:00', s: 'Język ukraiński (jako obcy)', lvl: 'PP' },
+  { d: '2027-05-06', t: '09:00', s: 'Język łaciński',          lvl: 'PP' },
   { d: '2027-05-06', t: '14:00', s: 'Matematyka w języku obcym', lvl: 'PP', bil: true },
   { d: '2027-05-06', t: '15:35', s: 'Geografia w języku obcym',  lvl: 'PR', bil: true },
 
   { d: '2027-05-07', t: '09:00', s: 'Język angielski',         lvl: 'PR',
     note: 'Rozszerzenie, które wybiera pół rocznika „bo i tak umiem”.' },
   { d: '2027-05-07', t: '09:00', s: 'Język angielski',         lvl: 'DJ' },
-  { d: '2027-05-07', t: '09:00', s: 'Historia muzyki',         lvl: 'PR' },
+  { d: '2027-05-07', t: '14:00', s: 'Historia muzyki',         lvl: 'PR' },
 
   { d: '2027-05-10', t: '09:00', s: 'Biologia',                lvl: 'PR',
     note: 'Medycyna zaczyna się tutaj. I tutaj też się dla wielu kończy.' },
-  { d: '2027-05-10', t: '09:00', s: 'Filozofia',               lvl: 'PR' },
+  { d: '2027-05-10', t: '14:00', s: 'Filozofia',               lvl: 'PR' },
 
   { d: '2027-05-11', t: '09:00', s: 'Matematyka',              lvl: 'PR',
-    note: 'Cztery godziny. Politechniki patrzą.' },
-  { d: '2027-05-11', t: '09:00', s: 'Język rosyjski',          lvl: 'PR' },
-  { d: '2027-05-11', t: '09:00', s: 'Język rosyjski',          lvl: 'DJ' },
+    note: 'Trzy godziny. Politechniki patrzą.' },
+  { d: '2027-05-11', t: '14:00', s: 'Język rosyjski',          lvl: 'PR' },
+  { d: '2027-05-11', t: '14:00', s: 'Język rosyjski',          lvl: 'DJ' },
 
   { d: '2027-05-12', t: '09:00', s: 'Wiedza o społeczeństwie', lvl: 'PR' },
-  { d: '2027-05-12', t: '09:00', s: 'Język niemiecki',         lvl: 'PR' },
-  { d: '2027-05-12', t: '09:00', s: 'Język niemiecki',         lvl: 'DJ' },
+  { d: '2027-05-12', t: '14:00', s: 'Język niemiecki',         lvl: 'PR' },
+  { d: '2027-05-12', t: '14:00', s: 'Język niemiecki',         lvl: 'DJ' },
 
   { d: '2027-05-13', t: '09:00', s: 'Chemia',                  lvl: 'PR',
     note: 'Egzamin, po którym rocznik zbiorowo zmienia plany życiowe.' },
-  { d: '2027-05-13', t: '09:00', s: 'Historia sztuki',         lvl: 'PR' },
+  { d: '2027-05-13', t: '14:00', s: 'Historia sztuki',         lvl: 'PR' },
 
-  { d: '2027-05-14', t: '09:00', s: 'Informatyka',             lvl: 'PR' },
-  { d: '2027-05-14', t: '09:00', s: 'Język ukraiński (jako obcy)', lvl: 'PR' },
-  { d: '2027-05-14', t: '09:00', s: 'Język ukraiński (jako obcy)', lvl: 'DJ' },
-
-  { d: '2027-05-17', t: '09:00', s: 'Geografia',               lvl: 'PR',
+  { d: '2027-05-14', t: '09:00', s: 'Geografia',               lvl: 'PR',
     note: 'Najpopularniejsze rozszerzenie w kraju. Tak, wciąż.' },
-  { d: '2027-05-17', t: '09:00', s: 'Języki mniejszości narodowych', lvl: 'PR' },
+  { d: '2027-05-14', t: '14:00', s: 'Język łaciński i kultura antyczna', lvl: 'PR' },
+  { d: '2027-05-14', t: '14:00', s: 'Język ukraiński (jako obcy)', lvl: 'PR' },
+  { d: '2027-05-14', t: '14:00', s: 'Język ukraiński (jako obcy)', lvl: 'DJ' },
+
+  { d: '2027-05-17', t: '09:00', s: 'Informatyka',             lvl: 'PR' },
+  { d: '2027-05-17', t: '14:00', s: 'Języki mniejszości narodowych', lvl: 'PR' },
+  { d: '2027-05-17', t: '14:00', s: 'Język kaszubski',         lvl: 'PR' },
+  { d: '2027-05-17', t: '14:00', s: 'Język łemkowski',         lvl: 'PR' },
 
   { d: '2027-05-18', t: '09:00', s: 'Historia',                lvl: 'PR' },
-  { d: '2027-05-18', t: '09:00', s: 'Język francuski',         lvl: 'PR' },
-  { d: '2027-05-18', t: '09:00', s: 'Język francuski',         lvl: 'DJ' },
+  { d: '2027-05-18', t: '14:00', s: 'Język francuski',         lvl: 'PR' },
+  { d: '2027-05-18', t: '14:00', s: 'Język francuski',         lvl: 'DJ' },
 
   { d: '2027-05-19', t: '09:00', s: 'Fizyka',                  lvl: 'PR' },
-  { d: '2027-05-19', t: '09:00', s: 'Język hiszpański',        lvl: 'PR' },
-  { d: '2027-05-19', t: '09:00', s: 'Język hiszpański',        lvl: 'DJ' },
+  { d: '2027-05-19', t: '14:00', s: 'Język hiszpański',        lvl: 'PR' },
+  { d: '2027-05-19', t: '14:00', s: 'Język hiszpański',        lvl: 'DJ' },
 
   { d: '2027-05-20', t: '09:00', s: 'Język polski',            lvl: 'PR',
     note: 'Ostatni duży. Dla wielu — ostatni w ogóle.' },
-  { d: '2027-05-20', t: '09:00', s: 'Język włoski',            lvl: 'PR' },
-  { d: '2027-05-20', t: '09:00', s: 'Język włoski',            lvl: 'DJ' },
+  { d: '2027-05-20', t: '14:00', s: 'Język włoski',            lvl: 'PR' },
+  { d: '2027-05-20', t: '14:00', s: 'Język włoski',            lvl: 'DJ' },
 
-  { d: '2027-05-21', t: '09:00', s: 'Języki mniejszości narodowych', lvl: 'PP' },
-  { d: '2027-05-21', t: '09:00', s: 'Chemia w języku obcym',   lvl: 'PR', bil: true },
-  { d: '2027-05-21', t: '10:35', s: 'Fizyka w języku obcym',   lvl: 'PR', bil: true },
-  { d: '2027-05-21', t: '12:10', s: 'Biologia w języku obcym', lvl: 'PR', bil: true },
-  { d: '2027-05-21', t: '13:45', s: 'Historia w języku obcym', lvl: 'PR', bil: true },
+  { d: '2027-05-21', t: '09:00', s: 'Biznes i zarządzanie',    lvl: 'PR',
+    note: 'Premiera. Biznes i zarządzanie pierwszy raz na maturze — starych arkuszy nie ma nikt, więc cały rocznik startuje z tego samego miejsca.' },
+  { d: '2027-05-21', t: '14:00', s: 'Historia tańca',          lvl: 'PR' },
+
+  { d: '2027-05-24', t: '09:00', s: 'Języki mniejszości narodowych', lvl: 'PP',
+    note: 'Ostatni dzień sesji, ale już tylko dla garstki: języki mniejszości i przedmioty zdawane w języku obcym w klasach dwujęzycznych.' },
+  { d: '2027-05-24', t: '09:00', s: 'Chemia w języku obcym',   lvl: 'PR', bil: true },
+  { d: '2027-05-24', t: '10:35', s: 'Fizyka w języku obcym',   lvl: 'PR', bil: true },
+  { d: '2027-05-24', t: '12:10', s: 'Biologia w języku obcym', lvl: 'PR', bil: true },
+  { d: '2027-05-24', t: '13:45', s: 'Historia w języku obcym', lvl: 'PR', bil: true },
 ];
 
 /* --- Kamienie milowe roku maturalnego -------------------------------- */
@@ -93,11 +99,11 @@ export const MILESTONES = [
     desc: 'Podpis, którego nie da się cofnąć. Od teraz rozszerzenie jest twoje na dobre i na złe.' },
   { d: '2027-05-04', label: 'Start matury', main: true,
     desc: 'Godzina 9:00. Dwa długopisy. Dowód. Cała reszta to już tylko literatura.' },
-  { d: '2027-05-21', label: 'Koniec sesji pisemnej',
+  { d: '2027-05-24', label: 'Koniec sesji pisemnej',
     desc: 'Ostatni arkusz oddany. Zaczyna się najdłuższy miesiąc w twoim życiu.' },
-  { d: '2027-07-07', label: 'Wyniki', approx: true,
+  { d: '2027-07-09', label: 'Wyniki',
     desc: 'Logowanie o 8:30, serwer pada o 8:31. Klasyka gatunku.' },
-  { d: '2027-08-24', label: 'Poprawka', approx: true,
+  { d: '2027-08-23', label: 'Poprawka',
     desc: 'Druga szansa istnieje. Tylko z jednego przedmiotu, ale istnieje.' },
 ];
 

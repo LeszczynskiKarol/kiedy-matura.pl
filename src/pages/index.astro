@@ -11,7 +11,7 @@ import {
 
 /* ── Punkty odniesienia ─────────────────────────────────────────────── */
 const START = dt(EXAMS[0].d, EXAMS[0].t);              // 4 maja 2027, 9:00
-const LAST  = dt(EXAMS[EXAMS.length - 1].d, "15:00");
+const LAST  = dt(EXAMS[EXAMS.length - 1].d, "15:05");
 const NOW   = new Date();
 
 /* Faza wyliczona w czasie builda — skrypt klienta poprawi ją, gdy build
@@ -76,8 +76,8 @@ const clientData = {
   oracle: ORACLE,
   exams: EXAMS.map((e: any) => ({ d: e.d, t: e.t, s: e.s, lvl: e.lvl, core: !!e.core, bil: !!e.bil })),
   start: `${EXAMS[0].d}T${EXAMS[0].t}`,
-  last: `${EXAMS[EXAMS.length - 1].d}T15:00`,
-  results: "2027-07-07T08:30",
+  last: `${EXAMS[EXAMS.length - 1].d}T15:05`,
+  results: "2027-07-09T08:30",
   yearStart: "2026-09-01T00:00",
   official: OFFICIAL,
 };
@@ -94,13 +94,13 @@ const jsonLd = [
     "@type": "FAQPage",
     mainEntity: [
       { "@type": "Question", name: "Kiedy jest matura 2027?", acceptedAnswer: { "@type": "Answer",
-        text: "Sesja pisemna matury 2027 rozpoczyna się we wtorek 4 maja 2027 o godzinie 9:00 egzaminem z języka polskiego na poziomie podstawowym i kończy się 21 maja 2027. Oficjalny harmonogram CKE ogłasza do 20 sierpnia 2026." } },
+        text: "Sesja pisemna matury 2027 rozpoczyna się we wtorek 4 maja 2027 o godzinie 9:00 egzaminem z języka polskiego na poziomie podstawowym i kończy się 24 maja 2027. Egzaminy ustne trwają od 6 do 31 maja. Terminy pochodzą z komunikatu dyrektora CKE z 20 sierpnia 2026 r." } },
       { "@type": "Question", name: "Do kiedy trzeba złożyć deklarację maturalną 2027?", acceptedAnswer: { "@type": "Answer",
         text: "Deklaracja wstępna do 30 września 2026, deklaracja ostateczna do 7 lutego 2027." } },
       { "@type": "Question", name: "Ile procent trzeba, żeby zdać maturę?", acceptedAnswer: { "@type": "Answer",
         text: "Co najmniej 30% z każdego przedmiotu obowiązkowego na poziomie podstawowym: języka polskiego, matematyki i języka obcego nowożytnego, w części pisemnej i ustnej. Z przedmiotu dodatkowego na poziomie rozszerzonym wystarczy przystąpić do egzaminu." } },
       { "@type": "Question", name: "Kiedy są wyniki matury 2027?", acceptedAnswer: { "@type": "Answer",
-        text: "Wyniki matury 2027 zostaną ogłoszone na początku lipca 2027, a egzamin poprawkowy odbędzie się w drugiej połowie sierpnia 2027." } },
+        text: "Wyniki matury 2027 zostaną ogłoszone 9 lipca 2027. Egzamin poprawkowy odbędzie się 23 sierpnia 2027 (część pisemna, godz. 9:00) i 24 sierpnia 2027 (część ustna), a jego wyniki poznamy 10 września 2027." } },
     ],
   },
   {
@@ -108,12 +108,12 @@ const jsonLd = [
     "@type": "Event",
     name: "Matura 2027 — egzamin z języka polskiego (poziom podstawowy)",
     startDate: "2027-05-04T09:00:00+02:00",
-    endDate: "2027-05-21T15:00:00+02:00",
+    endDate: "2027-05-24T15:05:00+02:00",
     eventStatus: "https://schema.org/EventScheduled",
     eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
     location: { "@type": "Place", name: "Szkoły ponadpodstawowe w Polsce",
                 address: { "@type": "PostalAddress", addressCountry: "PL" } },
-    description: "Sesja główna egzaminu maturalnego 2027. Termin przewidywany do czasu ogłoszenia komunikatu CKE.",
+    description: "Sesja główna egzaminu maturalnego 2027 zgodnie z komunikatem dyrektora CKE z 20 sierpnia 2026 r.",
   },
 ];
 ---
@@ -411,11 +411,11 @@ const jsonLd = [
       <div class="faq">
         <details open>
           <summary>Kiedy dokładnie jest matura 2027?</summary>
-          <p>Sesja pisemna rusza <strong>we wtorek 4 maja 2027 o 9:00</strong> egzaminem z języka polskiego na poziomie podstawowym — bo egzaminy tradycyjnie zaczynają się w pierwszy dzień roboczy po 3 maja, a w 2027 roku 3 maja wypada w poniedziałek. Pisemna część kończy się <strong>21 maja</strong>.</p>
+          <p>Sesja pisemna rusza <strong>we wtorek 4 maja 2027 o 9:00</strong> egzaminem z języka polskiego na poziomie podstawowym — bo egzaminy tradycyjnie zaczynają się w pierwszy dzień roboczy po 3 maja, a w 2027 roku 3 maja wypada w poniedziałek. Pisemna część kończy się <strong>24 maja</strong>, a egzaminy ustne trwają <strong>od 6 do 31 maja</strong> i to szkoła wyznacza w tym oknie Twój dzień i godzinę.</p>
         </details>
         <details>
           <summary>Czy te daty są oficjalne?</summary>
-          <p>Jeszcze nie. <strong>CKE publikuje komunikat o harmonogramie matury 2027 do 20 sierpnia 2026 roku.</strong> Do tego czasu terminy na tej stronie są przewidywane — odwzorowane jeden do jednego na realnym harmonogramie z 2026 roku (ten sam układ dni tygodnia, te same godziny, ta sama kolejność przedmiotów). Po ogłoszeniu komunikatu podmienimy je na oficjalne, a odliczanie przeskoczy samo.</p>
+          <p>Tak. Wszystkie terminy na tej stronie pochodzą z <strong>komunikatu dyrektora CKE z 20 sierpnia 2026 roku</strong> o harmonogramie egzaminów w 2027 r. — to jest ten jeden wiążący dokument, a nie zestawienie „na oko” z zeszłego roku. Jest w nim też <strong>termin dodatkowy: 1–16 czerwca 2027</strong> (pisemny) i 7–9 czerwca (ustny), dla osób, które z powodów zdrowotnych albo losowych nie podejdą w maju.</p>
         </details>
         <details>
           <summary>Do kiedy trzeba złożyć deklarację?</summary>
@@ -431,7 +431,7 @@ const jsonLd = [
         </details>
         <details>
           <summary>Kiedy będą wyniki i kiedy jest poprawka?</summary>
-          <p>Wyniki matury 2027 poznasz <strong>na początku lipca 2027</strong> (w 2026 roku był to 8 lipca). Egzamin poprawkowy — <strong>w drugiej połowie sierpnia 2027</strong>, i przysługuje tylko wtedy, gdy nie zdałeś <em>jednego</em> przedmiotu obowiązkowego. Wyniki poprawki: wrzesień.</p>
+          <p>Wyniki matury 2027 poznasz <strong>9 lipca 2027</strong>. Egzamin poprawkowy — <strong>23 sierpnia 2027 o 9:00</strong> (część pisemna) i <strong>24 sierpnia</strong> (część ustna); przysługuje tylko wtedy, gdy nie zdałeś <em>jednego</em> przedmiotu obowiązkowego. Wyniki poprawki: <strong>10 września 2027</strong>.</p>
         </details>
       </div>
 
