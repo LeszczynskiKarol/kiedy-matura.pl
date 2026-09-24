@@ -15,9 +15,9 @@ import { eduLinksFor } from "../../data/edu-network.mjs";
 import { dt, daysBetween, fmtDate, capital, DOW, dniWord } from "../../lib/matura-utils";
 
 const E8 = [
-  { d: "2027-05-10", t: "09:00", s: "Język polski",          min: 120 },
-  { d: "2027-05-11", t: "09:00", s: "Matematyka",            min: 100 },
-  { d: "2027-05-12", t: "09:00", s: "Język obcy nowożytny",  min: 90 },
+  { d: "2027-05-10", t: "09:00", s: "Język polski",          min: 150 },
+  { d: "2027-05-11", t: "09:00", s: "Matematyka",            min: 125 },
+  { d: "2027-05-12", t: "09:00", s: "Język obcy nowożytny",  min: 110 },
 ];
 const EXTRA = [
   { d: "2027-06-09", s: "Język polski" },
@@ -33,11 +33,11 @@ const daysNow = Math.max(0, daysBetween(NOW, START));
 const TIMELINE = [
   { d: "2026-09-30", label: "deklaracja", title: "Wybór języka obcego",
     desc: "Rodzice składają w szkole deklarację, z którego języka obcego uczeń przystąpi do egzaminu. Zmiana jest możliwa jeszcze do 15 lutego 2027." },
-  { d: "2027-05-10", label: "dzień 1", title: "Język polski, 9:00 — 120 minut",
+  { d: "2027-05-10", label: "dzień 1", title: "Język polski, 9:00 — 150 minut",
     desc: "Tekst literacki i nieliteracki, zadania zamknięte i otwarte, na końcu wypracowanie (opowiadanie albo rozprawka, minimum 200 wyrazów)." },
-  { d: "2027-05-11", label: "dzień 2", title: "Matematyka, 9:00 — 100 minut",
+  { d: "2027-05-11", label: "dzień 2", title: "Matematyka, 9:00 — 125 minut",
     desc: "Około 19 zadań: zamknięte za 1 punkt i otwarte za 2–4 punkty. Bez kalkulatora, ale z linijką." },
-  { d: "2027-05-12", label: "dzień 3", title: "Język obcy nowożytny, 9:00 — 90 minut",
+  { d: "2027-05-12", label: "dzień 3", title: "Język obcy nowożytny, 9:00 — 110 minut",
     desc: "Słuchanie, funkcje językowe, czytanie, środki językowe i e-mail. Nagrania odtwarzane są dwa razy." },
   { d: "2027-06-09", label: "termin dodatkowy", title: "9, 10 i 11 czerwca 2027",
     desc: "Dla uczniów, którzy z powodów zdrowotnych lub losowych nie przystąpili do egzaminu w maju. Ta sama kolejność przedmiotów." },
@@ -60,7 +60,7 @@ const jsonLd = [
       { "@type": "Question", name: "Kiedy są wyniki egzaminu ósmoklasisty 2027?", acceptedAnswer: { "@type": "Answer",
         text: "Wyniki egzaminu ósmoklasisty 2027 zostaną ogłoszone 6 lipca 2027." } },
       { "@type": "Question", name: "Ile trwa egzamin ósmoklasisty?", acceptedAnswer: { "@type": "Answer",
-        text: "Język polski 120 minut, matematyka 100 minut, język obcy nowożytny 90 minut. Uczniowie z dostosowaniami mogą mieć czas wydłużony." } },
+        text: "Język polski 150 minut, matematyka 125 minut, język obcy nowożytny 110 minut (arkusz standardowy). Uczniowie z dostosowaniami mają czas wydłużony odpowiednio do 195, 165 i 145 minut." } },
       { "@type": "Question", name: "Czy egzamin ósmoklasisty można nie zdać?", acceptedAnswer: { "@type": "Answer",
         text: "Nie. Egzamin ósmoklasisty nie ma progu zaliczenia, ale jego wynik liczy się w rekrutacji do szkoły średniej: maksymalnie 100 punktów, po 35 za polski i matematykę oraz 30 za język obcy." } },
     ],
@@ -70,7 +70,7 @@ const jsonLd = [
     "@type": "Event",
     name: "Egzamin ósmoklasisty 2027",
     startDate: "2027-05-10T09:00:00+02:00",
-    endDate: "2027-05-12T10:30:00+02:00",
+    endDate: "2027-05-12T10:50:00+02:00",
     eventStatus: "https://schema.org/EventScheduled",
     eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
     location: { "@type": "Place", name: "Szkoły podstawowe w Polsce",
@@ -207,7 +207,7 @@ const startIso = `${E8[0].d}T${E8[0].t}:00`;
         </details>
         <details>
           <summary>Ile trwa każdy egzamin?</summary>
-          <p>Język polski <strong>120 minut</strong>, matematyka <strong>100 minut</strong>, język obcy <strong>90 minut</strong>. Uczniowie z dostosowaniami (np. dysleksja, opinia poradni) mogą mieć czas wydłużony — o tym decyduje szkoła na podstawie dokumentów złożonych jesienią.</p>
+          <p>Język polski <strong>150 minut</strong>, matematyka <strong>125 minut</strong>, język obcy <strong>110 minut</strong> — tyle ma arkusz standardowy. Uczniowie z dostosowaniami (np. dysleksja, opinia poradni) dostają czas wydłużony: 195, 165 i 145 minut. O dostosowaniu decyduje szkoła na podstawie dokumentów złożonych jesienią.</p>
         </details>
         <details>
           <summary>Kiedy będą wyniki?</summary>
