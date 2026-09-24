@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import { eduLinksFor } from '../data/edu-network.mjs';
 import ThemeToggle from "../components/ThemeToggle.astro";
 import "../styles/countdown.css";
 import { EXAMS, MILESTONES, PHASES, ORACLE, OFFICIAL } from "../data/matura";
@@ -116,6 +117,8 @@ const jsonLd = [
     description: "Sesja główna egzaminu maturalnego 2027 zgodnie z komunikatem dyrektora CKE z 20 sierpnia 2026 r.",
   },
 ];
+// Serwisy edukacyjne tego samego autora — patrz data/edu-network.mjs
+const eduLinks = eduLinksFor('kiedy-matura');
 ---
 
 <BaseLayout title={title} description={description} jsonLd={jsonLd}>
@@ -446,6 +449,7 @@ const jsonLd = [
   <footer class="site-foot">
     <p class="foot-line">kiedy-matura.pl — odliczanie, które kibicuje.</p>
     <p class="foot-dim">Powodzenia. Serio, powodzenia.</p>
+    <p class="foot-links"><span>Serwisy edukacyjne:</span>{eduLinks.map((l) => (<a href={l.href} title={l.desc}>{l.name}</a>))}</p>
   </footer>
 
   <script is:inline define:vars={{ KM: clientData }}>

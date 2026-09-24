@@ -492,6 +492,10 @@ button{ font:inherit; color:inherit; }
             border-top:1px solid var(--line); text-align:center; }
 .foot-line{ font-family:var(--ff-display); font-weight:600; }
 .foot-dim{ margin-top:7px; color:var(--faint); font-size:.9rem; }
+.foot-links{ margin-top:18px; display:flex; flex-wrap:wrap; justify-content:center; gap:6px 16px;
+             color:var(--faint); font-size:.85rem; }
+.foot-links a{ color:inherit; text-decoration:none; }
+.foot-links a:hover{ text-decoration:underline; }
 
 /* ---------- RWD ---------- */
 @media (max-width:1000px){
