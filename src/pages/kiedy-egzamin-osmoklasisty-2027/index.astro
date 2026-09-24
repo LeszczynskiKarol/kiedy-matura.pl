@@ -1,0 +1,251 @@
+---
+/* Strona pomostowa: kiedy egzamin ósmoklasisty 2027.
+   Serwis jest o maturze, ale fraza „kiedy egzamin ósmoklasisty” ma tę samą
+   intencję co „kiedy matura” — odliczanie + harmonogram. Treść merytoryczna
+   (zadania, arkusze, diagnoza) zostaje w osmoklasista-online.pl; tu jest
+   tylko odliczanie, terminy i odesłanie.
+
+   ŹRÓDŁO TERMINÓW: komunikat dyrektora CKE z 20 sierpnia 2026 r. w sprawie
+   harmonogramu egzaminu ósmoklasisty i egzaminu maturalnego w 2027 roku
+   (ten sam dokument co dla matury w data/matura.ts). */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import ThemeToggle from "../../components/ThemeToggle.astro";
+import "../../styles/countdown.css";
+import { eduLinksFor } from "../../data/edu-network.mjs";
+import { dt, daysBetween, fmtDate, capital, DOW, dniWord } from "../../lib/matura-utils";
+
+const E8 = [
+  { d: "2027-05-10", t: "09:00", s: "Język polski",          min: 120 },
+  { d: "2027-05-11", t: "09:00", s: "Matematyka",            min: 100 },
+  { d: "2027-05-12", t: "09:00", s: "Język obcy nowożytny",  min: 90 },
+];
+const EXTRA = [
+  { d: "2027-06-09", s: "Język polski" },
+  { d: "2027-06-10", s: "Matematyka" },
+  { d: "2027-06-11", s: "Język obcy nowożytny" },
+];
+const RESULTS = "2027-07-06";
+
+const START = dt(E8[0].d, E8[0].t);
+const NOW = new Date();
+const daysNow = Math.max(0, daysBetween(NOW, START));
+
+const TIMELINE = [
+  { d: "2026-09-30", label: "deklaracja", title: "Wybór języka obcego",
+    desc: "Rodzice składają w szkole deklarację, z którego języka obcego uczeń przystąpi do egzaminu. Zmiana jest możliwa jeszcze do 15 lutego 2027." },
+  { d: "2027-05-10", label: "dzień 1", title: "Język polski, 9:00 — 120 minut",
+    desc: "Tekst literacki i nieliteracki, zadania zamknięte i otwarte, na końcu wypracowanie (opowiadanie albo rozprawka, minimum 200 wyrazów)." },
+  { d: "2027-05-11", label: "dzień 2", title: "Matematyka, 9:00 — 100 minut",
+    desc: "Około 19 zadań: zamknięte za 1 punkt i otwarte za 2–4 punkty. Bez kalkulatora, ale z linijką." },
+  { d: "2027-05-12", label: "dzień 3", title: "Język obcy nowożytny, 9:00 — 90 minut",
+    desc: "Słuchanie, funkcje językowe, czytanie, środki językowe i e-mail. Nagrania odtwarzane są dwa razy." },
+  { d: "2027-06-09", label: "termin dodatkowy", title: "9, 10 i 11 czerwca 2027",
+    desc: "Dla uczniów, którzy z powodów zdrowotnych lub losowych nie przystąpili do egzaminu w maju. Ta sama kolejność przedmiotów." },
+  { d: "2027-07-06", label: "wyniki", title: "Ogłoszenie wyników",
+    desc: "Wynik procentowy i centylowy z każdego przedmiotu — w systemie ZIU. Zaświadczenia szkoły wydają razem ze świadectwem ukończenia klasy ósmej." },
+];
+
+const title = "Kiedy egzamin ósmoklasisty 2027? Odliczanie i harmonogram";
+const description =
+  "Ile dni do egzaminu ósmoklasisty 2027? Żywe odliczanie i pełny harmonogram: 10 maja polski, " +
+  "11 maja matematyka, 12 maja język obcy, wyniki 6 lipca. Terminy z komunikatu CKE.";
+
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      { "@type": "Question", name: "Kiedy jest egzamin ósmoklasisty 2027?", acceptedAnswer: { "@type": "Answer",
+        text: "Egzamin ósmoklasisty 2027 odbywa się 10, 11 i 12 maja 2027 (poniedziałek, wtorek, środa), zawsze o godzinie 9:00: 10 maja język polski, 11 maja matematyka, 12 maja język obcy nowożytny. Terminy pochodzą z komunikatu dyrektora CKE z 20 sierpnia 2026 r." } },
+      { "@type": "Question", name: "Kiedy są wyniki egzaminu ósmoklasisty 2027?", acceptedAnswer: { "@type": "Answer",
+        text: "Wyniki egzaminu ósmoklasisty 2027 zostaną ogłoszone 6 lipca 2027." } },
+      { "@type": "Question", name: "Ile trwa egzamin ósmoklasisty?", acceptedAnswer: { "@type": "Answer",
+        text: "Język polski 120 minut, matematyka 100 minut, język obcy nowożytny 90 minut. Uczniowie z dostosowaniami mogą mieć czas wydłużony." } },
+      { "@type": "Question", name: "Czy egzamin ósmoklasisty można nie zdać?", acceptedAnswer: { "@type": "Answer",
+        text: "Nie. Egzamin ósmoklasisty nie ma progu zaliczenia, ale jego wynik liczy się w rekrutacji do szkoły średniej: maksymalnie 100 punktów, po 35 za polski i matematykę oraz 30 za język obcy." } },
+    ],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: "Egzamin ósmoklasisty 2027",
+    startDate: "2027-05-10T09:00:00+02:00",
+    endDate: "2027-05-12T10:30:00+02:00",
+    eventStatus: "https://schema.org/EventScheduled",
+    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+    location: { "@type": "Place", name: "Szkoły podstawowe w Polsce",
+                address: { "@type": "PostalAddress", addressCountry: "PL" } },
+    description: "Termin główny egzaminu ósmoklasisty 2027 zgodnie z komunikatem dyrektora CKE z 20 sierpnia 2026 r.",
+  },
+];
+
+// Serwisy edukacyjne tego samego autora — patrz data/edu-network.mjs
+const eduLinks = eduLinksFor("kiedy-matura");
+const startIso = `${E8[0].d}T${E8[0].t}:00`;
+---
+
+<BaseLayout title={title} description={description} jsonLd={jsonLd}>
+  <div class="bg" aria-hidden="true">
+    <div class="bg-aurora a1"></div>
+    <div class="bg-aurora a2"></div>
+    <div class="bg-aurora a3"></div>
+    <div class="bg-scrim"></div>
+    <div class="bg-grid"></div>
+    <svg class="bg-grain"><filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3"/></filter><rect width="100%" height="100%" filter="url(#grain)"/></svg>
+  </div>
+
+  <header class="site-head">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6.5V12l3.5 2.5"/></svg>
+      </span>
+      <span class="brand-text">kiedy&#8209;matura<span class="brand-dim">.pl</span></span>
+    </a>
+    <div class="head-right">
+      <nav class="site-nav">
+        <a href="/">Matura 2027</a>
+        <a href="#harmonogram">Harmonogram</a>
+        <a href="#faq">Pytania</a>
+      </nav>
+      <ThemeToggle />
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="hero-grid e8-grid">
+        <div class="hero-copy">
+          <p class="kicker">Egzamin ósmoklasisty 2027</p>
+
+          <div class="count">
+            <div class="count-main">
+              <span class="count-num" id="days">{daysNow}</span>
+              <span class="count-word" id="daysWord">{dniWord(daysNow)} do egzaminu</span>
+            </div>
+            <div class="count-sub" id="clock">
+              <span class="cs"><b id="hh">00</b><i>godz</i></span>
+              <span class="cs"><b id="mm">00</b><i>min</i></span>
+              <span class="cs"><b id="ss">00</b><i>sek</i></span>
+            </div>
+            <p class="count-target">
+              <span class="tg-line">Start: <b>{capital(DOW[START.getDay()])}, {fmtDate(START)}, godz. 9:00</b></span>
+              <span class="tg-line">język polski — pierwszy z trzech dni</span>
+            </p>
+          </div>
+
+          <h1 class="phase-title">Kiedy egzamin ósmoklasisty 2027?</h1>
+          <p class="phase-lead">
+            Trzy poranki z rzędu: <strong>10 maja</strong> polski, <strong>11 maja</strong> matematyka,
+            <strong>12 maja</strong> język obcy. Zawsze o 9:00, zawsze w swojej szkole.
+            Wyniki <strong>6 lipca 2027</strong>. Daty z komunikatu dyrektora CKE z 20 sierpnia 2026 r.
+          </p>
+          <p class="phase-quote">Egzaminu ósmoklasisty nie da się nie zdać. Da się za to zdać go dobrze.</p>
+        </div>
+
+        <div class="e8-days">
+          {E8.map((e) => {
+            const d = dt(e.d, e.t);
+            return (
+              <div class="e8-day">
+                <span class="e8-dow">{capital(DOW[d.getDay()])}</span>
+                <span class="e8-date">{fmtDate(d)}</span>
+                <span class="e8-subj">{e.s}</span>
+                <span class="e8-meta">9:00 · {e.min} min</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" id="harmonogram">
+      <div class="sec-head">
+        <h2>Harmonogram 2027</h2>
+        <p>Wszystko, co ma datę: od deklaracji językowej we wrześniu po wyniki w lipcu.</p>
+      </div>
+      <ol class="timeline">
+        {TIMELINE.map((t) => {
+          // 9:00 jak w hero — inaczej licznik i oś czasu różniłyby się o dzień.
+          const d = dt(t.d, "09:00");
+          const inDays = daysBetween(NOW, d);
+          return (
+            <li class="tl">
+              <div class="tl-top">
+                <span class="tl-date">{fmtDate(d)}</span>
+                <span class="tl-label">{t.label}</span>
+                <span class="tl-in">{inDays > 0 ? `za ${inDays} ${dniWord(inDays)}` : inDays === 0 ? "dziś" : "minęło"}</span>
+              </div>
+              <p class="tl-desc"><strong>{t.title}.</strong> {t.desc}</p>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+
+    <section class="sec">
+      <div class="bridge">
+        <p class="bridge-kicker">Odliczanie to jedno, przygotowanie to drugie</p>
+        <p>
+          Zadania w układzie arkusza CKE z polskiego, matematyki i angielskiego, próbne arkusze z zegarem
+          i wypracowania oceniane według kryteriów egzaminacyjnych są w serwisie
+          <a href="https://www.osmoklasista-online.pl/">Ósmoklasista Online</a> — tego samego autora co ta strona.
+          Na start wystarczy <a href="https://www.osmoklasista-online.pl/diagnoza">darmowa diagnoza bez logowania</a>:
+          pokazuje, z której części arkusza ucieka najwięcej punktów.
+        </p>
+      </div>
+    </section>
+
+    <section class="sec" id="faq">
+      <div class="sec-head">
+        <h2>Konkrety</h2>
+        <p>To, o co pytają rodzice i ósmoklasiści. Wszystko z komunikatu CKE albo z informatora.</p>
+      </div>
+      <div class="faq">
+        <details open>
+          <summary>Kiedy dokładnie jest egzamin ósmoklasisty 2027?</summary>
+          <p><strong>10 maja 2027 (poniedziałek) — język polski, 11 maja (wtorek) — matematyka, 12 maja (środa) — język obcy nowożytny.</strong> Każdy egzamin zaczyna się o 9:00. Termin dodatkowy dla osób nieobecnych z przyczyn zdrowotnych lub losowych: 9, 10 i 11 czerwca 2027.</p>
+        </details>
+        <details>
+          <summary>Ile trwa każdy egzamin?</summary>
+          <p>Język polski <strong>120 minut</strong>, matematyka <strong>100 minut</strong>, język obcy <strong>90 minut</strong>. Uczniowie z dostosowaniami (np. dysleksja, opinia poradni) mogą mieć czas wydłużony — o tym decyduje szkoła na podstawie dokumentów złożonych jesienią.</p>
+        </details>
+        <details>
+          <summary>Kiedy będą wyniki?</summary>
+          <p><strong>6 lipca 2027.</strong> Każdy uczeń zobaczy wynik procentowy i centylowy z trzech przedmiotów w systemie ZIU; zaświadczenie papierowe wydaje szkoła. Wyniki trafiają automatycznie do systemu rekrutacji do szkół ponadpodstawowych.</p>
+        </details>
+        <details>
+          <summary>Czy ten egzamin można oblać?</summary>
+          <p>Nie — <strong>nie ma progu zaliczenia</strong>, przystąpienie jest obowiązkowe, ale wynik nie decyduje o ukończeniu szkoły. Decyduje za to o rekrutacji: wynik procentowy z polskiego i matematyki mnoży się przez 0,35, z języka obcego przez 0,3 — razem maksymalnie <strong>100 punktów</strong>, czyli połowa całej puli rekrutacyjnej.</p>
+        </details>
+        <details>
+          <summary>Co trzeba mieć ze sobą?</summary>
+          <p><strong>Legitymację szkolną, czarny długopis</strong> (najlepiej dwa), na matematykę dodatkowo <strong>linijkę</strong>. Kalkulator, telefon i smartwatch zostają poza salą. Wodę można wnieść w butelce, którą stawia się na podłodze obok ławki.</p>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-foot">
+    <p class="foot-line">kiedy-matura.pl — odliczanie, które kibicuje.</p>
+    <p class="foot-dim">Powodzenia. Serio, powodzenia.</p>
+    <p class="foot-links"><span>Serwisy edukacyjne:</span>{eduLinks.map((l) => (<a href={l.href} title={l.desc}>{l.name}</a>))}</p>
+  </footer>
+
+  <script is:inline define:vars={{ startIso }}>
+    (function () {
+      var target = new Date(startIso).getTime();
+      var days = document.getElementById("days"), word = document.getElementById("daysWord");
+      var hh = document.getElementById("hh"), mm = document.getElementById("mm"), ss = document.getElementById("ss");
+      function dni(n) { var m10 = n % 10, m100 = n % 100; if (n === 1) return "dzień"; return "dni"; }
+      function pad(n) { return String(n).padStart(2, "0"); }
+      function tick() {
+        var now = Date.now(), diff = Math.max(0, target - now);
+        var d = Math.floor(diff / 86400000);
+        var h = Math.floor(diff / 3600000) % 24, m = Math.floor(diff / 60000) % 60, s = Math.floor(diff / 1000) % 60;
+        days.textContent = d; word.textContent = dni(d) + " do egzaminu";
+        hh.textContent = pad(h); mm.textContent = pad(m); ss.textContent = pad(s);
+      }
+      tick(); setInterval(tick, 1000);
+    })();
+  </script>
+</BaseLayout>

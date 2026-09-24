@@ -497,6 +497,23 @@ button{ font:inherit; color:inherit; }
 .foot-links a{ color:inherit; text-decoration:none; }
 .foot-links a:hover{ text-decoration:underline; }
 
+/* ---------- /kiedy-egzamin-osmoklasisty-2027 ---------- */
+.e8-grid{ align-items:start; }
+.e8-days{ display:grid; gap:12px; padding-top:34px; }
+.e8-day{ display:grid; grid-template-columns:auto 1fr; gap:2px 16px; align-items:baseline;
+         padding:16px 20px; border:1px solid var(--line); border-radius:14px;
+         background:color-mix(in srgb, var(--bg) 60%, transparent); }
+.e8-dow{ font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); }
+.e8-date{ font-family:var(--ff-display); font-weight:700; font-size:1.05rem; grid-column:2; }
+.e8-subj{ grid-column:2; font-size:1.02rem; }
+.e8-meta{ grid-column:2; color:var(--faint); font-size:.85rem; }
+.bridge{ padding:26px 28px; border:1px solid var(--line); border-radius:16px;
+         background:color-mix(in srgb, var(--bg) 60%, transparent); max-width:70ch; }
+.bridge-kicker{ font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); margin-bottom:10px; }
+.bridge p{ color:var(--dim); line-height:1.6; }
+.bridge a{ color:var(--txt); text-decoration:underline; text-underline-offset:3px; }
+@media (max-width:1000px){ .e8-days{ padding-top:0; } }
+
 /* ---------- RWD ---------- */
 @media (max-width:1000px){
   .hero-grid{ grid-template-columns:1fr; gap:28px; }
