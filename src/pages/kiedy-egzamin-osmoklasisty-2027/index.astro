@@ -228,7 +228,7 @@ const startIso = `${E8[0].d}T${E8[0].t}:00`;
   <footer class="site-foot">
     <p class="foot-line">kiedy-matura.pl — odliczanie, które kibicuje.</p>
     <p class="foot-dim">Powodzenia. Serio, powodzenia.</p>
-    <p class="foot-links"><span>Serwisy edukacyjne:</span>{eduLinks.map((l) => (<a href={l.href} title={l.desc}>{l.name}</a>))}</p>
+    <p class="foot-links"><span>Serwisy edukacyjne:</span>{eduLinks.map((l) => (<a rel="nofollow" href={l.href} title={l.desc}>{l.name}</a>))}</p>
   </footer>
 
   <script is:inline define:vars={{ startIso }}>
